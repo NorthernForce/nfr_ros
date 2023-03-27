@@ -57,8 +57,15 @@ def generate_launch_description():
         parameters=[{
             'odom0': '/odom',
             'odom0_config': [
-                True, True, False, False, False, True,
-                True, True, False, False, False, True,
+                False, False, False, False, False, False,
+                True, True, False, False, False, False,
+                False, False, False
+            ],
+            'odom0_differential': True,
+            'imu0': '/imu',
+            'imu0_config': [
+                False, False, False, False, False, True,
+                False, False, False, False, False, False,
                 False, False, False
             ],
             'world_frame': 'odom'
@@ -74,13 +81,20 @@ def generate_launch_description():
         parameters=[{
             'odom0': '/odom',
             'odom0_config': [
-                True, True, False, False, False, True,
-                True, True, False, False, False, True,
+                False, False, False, False, False, False,
+                True, True, False, False, False, False,
+                False, False, False
+            ],
+            'odom0_differential': True,
+            'imu0': '/imu',
+            'imu0_config': [
+                False, False, False, False, False, True,
+                False, False, False, False, False, False,
                 False, False, False
             ],
             'pose0': '/realsense/pose_estimations',
             'pose0_config': [
-                True, True, False, False, False, True,
+                True, True, False, False, False, False,
                 False, False, False, False, False, False,
                 False, False, False
             ],

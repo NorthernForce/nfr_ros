@@ -3,6 +3,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/transform_listener.h>
@@ -20,14 +21,15 @@ namespace nfr
     {
     private:
         nt::NetworkTableInstance instance;
-        std::shared_ptr<nt::NetworkTable> table, odometryTable, targetPoseTable, cmdVelTable, globalSetPoseTable, poseTable;
-        nt::DoubleSubscriber odometryX, odometryY, odometryTheta, odometryDeltaX, odometryDeltaY, odometryDeltaTheta, targetPoseX, targetPoseY,
-            targetPoseTheta, globalSetPoseX, globalSetPoseY, globalSetPoseTheta;
+        std::shared_ptr<nt::NetworkTable> table, odometryTable, targetPoseTable, cmdVelTable, globalSetPoseTable, poseTable, imuTable;
+        nt::DoubleSubscriber odometryDeltaX, odometryDeltaY, targetPoseX, targetPoseY, targetPoseTheta, globalSetPoseX, globalSetPoseY, globalSetPoseTheta,
+            imuTheta;
         nt::DoublePublisher cmdVelX, cmdVelY, cmdVelTheta, poseX, poseY, poseTheta;
-        nt::IntegerSubscriber odometryStamp, targetPoseStamp, globalSetPoseStamp;
+        nt::IntegerSubscriber odometryStamp, targetPoseStamp, globalSetPoseStamp, imuStamp;
         nt::IntegerPublisher poseStamp;
         nt::BooleanEntry targetPoseCancel;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometryPublisher;
+        rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPublisher;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr globalSetPosePublisher;
         rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmdVelSusbscription;
         rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr navigateToPoseClient;
@@ -40,18 +42,19 @@ namespace nfr
         {
             std::string tableName = declare_parameter("table_name", "xavier");
             odometryPublisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+            imuPublisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
             globalSetPosePublisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("global_set_pose", 10);
             instance = nt::NetworkTableInstance::GetDefault();
             table = instance.GetTable(tableName);
             odometryTable = table->GetSubTable("odometry");
-            odometryX = odometryTable->GetDoubleTopic("x").Subscribe(0.0);
-            odometryY = odometryTable->GetDoubleTopic("y").Subscribe(0.0);
-            odometryTheta = odometryTable->GetDoubleTopic("theta").Subscribe(0.0);
             odometryDeltaX = odometryTable->GetDoubleTopic("vx").Subscribe(0.0);
-            odometryDeltaX = odometryTable->GetDoubleTopic("vy").Subscribe(0.0);
-            odometryDeltaX = odometryTable->GetDoubleTopic("vtheta").Subscribe(0.0);
+            odometryDeltaY = odometryTable->GetDoubleTopic("vy").Subscribe(0.0);
             odometryStamp = odometryTable->GetIntegerTopic("stamp").Subscribe(0);
             instance.AddListener(odometryStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
+            imuTable = table->GetSubTable("imu");
+            imuTheta = imuTable->GetDoubleTopic("theta").Subscribe(0.0);
+            imuStamp = imuTable->GetIntegerTopic("stamp").Subscribe(0);
+            instance.AddListener(odometryStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receiveIMU, this, std::placeholders::_1));
             targetPoseTable = table->GetSubTable("target_pose");
             targetPoseX = targetPoseTable->GetDoubleTopic("x").Subscribe(0.0);
             targetPoseY = targetPoseTable->GetDoubleTopic("y").Subscribe(0.0);
@@ -96,8 +99,6 @@ namespace nfr
                     double roll, pitch, yaw;
                     tf2::Matrix3x3(quaternion).getRPY(roll, pitch, yaw);
                     poseTheta.Set(yaw);
-                    RCLCPP_INFO(get_logger(), "map -> base_link: [%f, %f, %f]", transform.transform.translation.x,
-                        transform.transform.translation.y, yaw);
                     auto stamp = rclcpp::Time(transform.header.stamp);
                     std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
                     poseStamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)stamp.nanoseconds() + offset)).count());
@@ -118,15 +119,24 @@ namespace nfr
             odometry.header.frame_id = "odom";
             std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)odometryStamp.Get();
             odometry.header.stamp = rclcpp::Time(((std::chrono::nanoseconds)(timestamp - (std::chrono::microseconds)instance.GetServerTimeOffset().value())).count());
-            odometry.pose.pose.position.x = odometryX.Get();
-            odometry.pose.pose.position.y = odometryY.Get();
             odometry.twist.twist.linear.x = odometryDeltaX.Get();
             odometry.twist.twist.linear.y = odometryDeltaY.Get();
-            odometry.twist.twist.angular.z = odometryDeltaTheta.Get();
-            tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, odometryTheta.Get());
-            odometry.pose.pose.orientation = tf2::toMsg(quaternion);
             odometryPublisher->publish(odometry);
+        }
+        void receiveIMU(const nt::Event& event)
+        {
+            if (!instance.IsConnected())
+            {
+                return;
+            }
+            sensor_msgs::msg::Imu imu;
+            imu.header.frame_id = "base_link";
+            std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)imuStamp.Get();
+            imu.header.stamp = rclcpp::Time(((std::chrono::nanoseconds)(timestamp - (std::chrono::microseconds)instance.GetServerTimeOffset().value())).count());
+            tf2::Quaternion quaternion;
+            quaternion.setRPY(0, 0, imuTheta.Get());
+            imu.orientation = tf2::toMsg(quaternion);
+            imuPublisher->publish(imu);
         }
         void recieveGlobalSetPose(const nt::Event& event)
         {
@@ -183,6 +193,7 @@ namespace nfr
             {
                 return;
             }
+            RCLCPP_INFO(get_logger(), "Receiving velocities of [%f, %f, %f]", cmdVel.linear.x, cmdVel.linear.y, cmdVel.angular.z);
             cmdVelX.Set(cmdVel.linear.x);
             cmdVelY.Set(cmdVel.linear.y);
             cmdVelTheta.Set(cmdVel.angular.z);
