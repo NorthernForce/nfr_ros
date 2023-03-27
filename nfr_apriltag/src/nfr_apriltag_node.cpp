@@ -1,6 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
-#include <isaac_ros_apriltag_interfaces/msg/april_tag_detection_array.hpp>
+#include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -12,7 +12,7 @@
 #include <filesystem>
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-using AprilTagDetectionArray = isaac_ros_apriltag_interfaces::msg::AprilTagDetectionArray;
+using AprilTagDetectionArray = apriltag_msgs::msg::AprilTagDetectionArray;
 using std::placeholders::_1;
 namespace nfr
 {
@@ -58,30 +58,33 @@ namespace nfr
                 }
                 else
                 {
-                    if (!buffer->canTransform(detections.header.frame_id, baseFrame, tf2::get_now()))
+                    if (!buffer->canTransform(baseFrame, detections.header.frame_id, tf2::get_now()))
                     {
                         RCLCPP_ERROR(get_logger(), "Could not transform %s to %s.", baseFrame.c_str(), detections.header.frame_id.c_str());
                         return;
                     }
-                    RCLCPP_INFO(get_logger(), "detection.pose.pose.pose.position = [%f, %f, %f]", detection.pose.pose.pose.position.x,
-                        detection.pose.pose.pose.position.y, detection.pose.pose.pose.position.z);
+                    if (!buffer->canTransform(detections.header.frame_id, "36h11:" + std::to_string(detection.id), tf2::get_now()))
+                    {
+                        RCLCPP_ERROR(get_logger(), "Could not transform %s to %s.", detections.header.frame_id.c_str(),
+                            ("36h11:" + std::to_string(detection.id)).c_str());
+                    }
                     auto worldToTag = tagPoses[detection.id];
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = "map";
                     pose.header.stamp = detections.header.stamp;
-                    pose.pose.pose.position.x = worldToTag.getOrigin().getX();
-                    pose.pose.pose.position.y = worldToTag.getOrigin().getY();
-                    pose.pose.pose.position.z = worldToTag.getOrigin().getZ();
-                    auto baseToCamera = buffer->lookupTransform(detections.header.frame_id, baseFrame, tf2::get_now());
-                    pose.pose.pose.position.x -= baseToCamera.transform.translation.x + detection.pose.pose.pose.position.z;
-                    pose.pose.pose.position.y -= baseToCamera.transform.translation.y + detection.pose.pose.pose.position.x;
-                    pose.pose.pose.position.z -= baseToCamera.transform.translation.z + detection.pose.pose.pose.position.y;
-                    tf2::Quaternion baseToCameraQuaternion;
-                    tf2::fromMsg(baseToCamera.transform.rotation, baseToCameraQuaternion);
-                    tf2::Quaternion cameraToTagQuaternion;
-                    tf2::fromMsg(detection.pose.pose.pose.orientation, cameraToTagQuaternion);
-                    tf2::Quaternion worldToRobot = worldToTag * cameraToTagQuaternion.inverse() * cameraToTagQuaternion.inverse();
-                    pose.pose.pose.orientation = tf2::toMsg(worldToRobot);
+                    auto baseToCamera = buffer->lookupTransform(baseFrame, detections.header.frame_id, tf2::get_now());
+                    tf2::Transform baseToCameraTransform;
+                    tf2::fromMsg(baseToCamera.transform, baseToCameraTransform);
+                    tf2::Transform cameraToTagTransform;
+                    auto detectionPose = buffer->lookupTransform(detections.header.frame_id, "36h11:" + std::to_string(detection.id), tf2::get_now());
+                    tf2::fromMsg(detectionPose.transform, cameraToTagTransform);
+                    auto tmp = baseToCameraTransform * cameraToTagTransform;
+                    RCLCPP_INFO(get_logger(), "[%f, %f, %f]", tmp.getOrigin().getX(), tmp.getOrigin().getY(), tmp.getOrigin().getZ());
+                    tf2::Transform worldToRobot = worldToTag * tmp;
+                    pose.pose.pose.position.x = worldToRobot.getOrigin().getX();
+                    pose.pose.pose.position.y = worldToRobot.getOrigin().getY();
+                    pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
+                    pose.pose.pose.orientation = tf2::toMsg(worldToRobot.getRotation());
                     publisher->publish(pose);
                 }
             }
