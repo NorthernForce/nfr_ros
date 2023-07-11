@@ -139,6 +139,41 @@ namespace nfr_ros
                                 detectorTable->GetEntry("ids").SetIntegerArray(ids);
                             });
                         }
+                        else
+                        {
+                            RCLCPP_WARN(get_logger(), "Nvidia ISAAC ROS not supported at the moment.");
+                        }
+                    }
+                    else if (string(_export->Name()) == "pose")
+                    {
+                        const auto& table = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->Value());
+                        string sourceFrame = _export->FirstChildElement("source_frame")->Value();
+                        string targetFrame = _export->FirstChildElement("target_frame")->Value();
+                        create_wall_timer(10ms, [&]() {
+                            try
+                            {
+                                TransformStamped transform = buffer->lookupTransform(
+                                    targetFrame,
+                                    sourceFrame,
+                                    tf2::TimePointZero
+                                );
+                                table->GetEntry("timestamp").SetDouble(transform.header.stamp.nanosec);
+                                table->GetEntry("x").SetDouble(transform.transform.translation.x);
+                                table->GetEntry("y").SetDouble(transform.transform.translation.y);
+                                table->GetEntry("z").SetDouble(transform.transform.translation.z);
+                                table->GetEntry("rotation").SetDoubleArray(std::vector<double>{
+                                    transform.transform.rotation.w,
+                                    transform.transform.rotation.x,
+                                    transform.transform.rotation.y,
+                                    transform.transform.rotation.z
+                                });
+                            }
+                            catch (tf2::LookupException& e)
+                            {
+                                RCLCPP_ERROR(get_logger(), "Could not find transform from %s to %s: %s",
+                                    sourceFrame, targetFrame, e.what());
+                            }
+                        });
                     }
                 }
             }
