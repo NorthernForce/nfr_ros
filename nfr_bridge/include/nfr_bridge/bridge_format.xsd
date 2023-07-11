@@ -16,6 +16,7 @@
                             <xs:complexType>
                                 <xs:element name="source_topic" type="xs:string"/>
                                 <xs:element name="target_topic" type="xs:string"/>
+                                <xs:element name="camera_name" type="xs:string"/>
                                 <xs:attribute name="isaac_ros" type="xs:bool"/>
                             </xs:complexType>
                         </xs:element>
