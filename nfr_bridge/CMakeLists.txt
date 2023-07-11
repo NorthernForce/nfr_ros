@@ -8,19 +8,24 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(apriltag_msgs REQUIRED)
 find_package(wpilib REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(TinyXML2 REQUIRED)
 
 add_executable(nfr_bridge_node src/nfr_bridge_node.cpp)
-ament_target_dependencies(nfr_bridge_node rclcpp tinyxml2_vendor)
+ament_target_dependencies(nfr_bridge_node rclcpp nav_msgs apriltag_msgs tf2_geometry_msgs sensor_msgs geometry_msgs tf2 tf2_ros tinyxml2_vendor)
 target_include_directories(nfr_bridge_node PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 target_compile_features(nfr_bridge_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_link_libraries(nfr_bridge_node cameraserver ntcore cscore wpiutil)
+target_link_libraries(nfr_bridge_node cameraserver ntcore tinyxml2 cscore wpiutil)
 install(TARGETS nfr_bridge_node
     DESTINATION lib/${PROJECT_NAME})
 
