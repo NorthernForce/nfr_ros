@@ -1,25 +1,30 @@
 #include <rclcpp/rclcpp.hpp>
-#include <nav2_msgs/srv/manage_lifecycle_nodes.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <nav2_msgs/action/navigate_to_pose.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 using namespace rclcpp;
 using namespace std;
-using ManageLifecycleNodes = nav2_msgs::srv::ManageLifecycleNodes;
-using ManageLifecycleNodes_Request = nav2_msgs::srv::ManageLifecycleNodes_Request;
+using NavigateToPose = nav2_msgs::action::NavigateToPose;
+template<typename T>
+using ActionClient = rclcpp_action::Client<T>;
+using PoseStamped = geometry_msgs::msg::PoseStamped;
 namespace nfr_ros
 {
     class NFRNavNode : public Node
     {
     private:
-        shared_ptr<Client<ManageLifecycleNodes>> manageLifecycleNodes;
+        shared_ptr<ActionClient<NavigateToPose>> navigateToPose;
+        shared_ptr<Subscription<PoseStamped>> targetPoseSubscriber;
     public:
         NFRNavNode() : Node("nfr_nav_node")
         {
-            manageLifecycleNodes = create_client<ManageLifecycleNodes>("/lifecycle_manager/manage_nodes");
-            const auto& request = std::make_shared<ManageLifecycleNodes_Request>();
-            request->command = ManageLifecycleNodes_Request::STARTUP;
-            RCLCPP_INFO(get_logger(), "Trying to start up nodes");
-            const auto& future = manageLifecycleNodes->async_send_request(request);
-            future.wait();
-            RCLCPP_INFO(get_logger(), "Successfully started up nodes");
+            navigateToPose = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
+            targetPoseSubscriber = create_subscription<PoseStamped>("go_to_pose_destination", 10, [&](const PoseStamped& pose)
+            {
+                NavigateToPose::Goal goal;
+                goal.pose = pose;
+                navigateToPose->async_send_goal(goal);
+            });
         }
     };
 }

@@ -10,9 +10,9 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
-
+find_package(rclcpp_action REQUIRED)
 add_executable(nfr_nav_node src/nfr_nav_node.cpp)
-ament_target_dependencies(nfr_nav_node nav2_msgs geometry_msgs rclcpp)
+ament_target_dependencies(nfr_nav_node nav2_msgs rclcpp_action geometry_msgs rclcpp)
 target_include_directories(nfr_nav_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
