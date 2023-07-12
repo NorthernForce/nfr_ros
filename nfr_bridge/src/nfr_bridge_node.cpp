@@ -11,6 +11,8 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <mutex>
 using namespace rclcpp;
 using namespace std;
 using namespace tinyxml2;
@@ -18,6 +20,7 @@ using Odometry = nav_msgs::msg::Odometry;
 using Image = sensor_msgs::msg::Image;
 using Quaternion = tf2::Quaternion;
 using TransformStamped = geometry_msgs::msg::TransformStamped;
+using PoseStamped = geometry_msgs::msg::PoseStamped;
 using TransformBroadcaster = tf2_ros::TransformBroadcaster;
 using TransformListener = tf2_ros::TransformListener;
 using TransformBuffer = tf2_ros::Buffer;
@@ -27,9 +30,11 @@ namespace nfr_ros
     class NFRBridgeNode : public Node
     {
     private:
+        std::mutex mutex;
         nt::NetworkTableInstance instance;
         shared_ptr<nt::NetworkTable> rosTable, odometryTable;
         shared_ptr<Publisher<Odometry>> odometryPublisher;
+        shared_ptr<TimerBase> odometryTimer;
         shared_ptr<TransformBroadcaster> broadcaster;
         shared_ptr<TransformListener> listener;
         shared_ptr<TransformBuffer> buffer;
@@ -58,12 +63,13 @@ namespace nfr_ros
                 {
                     if (string(import->Name()) == "odometry")
                     {
-                        odometryTable = rosTable->GetSubTable(import->FirstChildElement("source_topic")->Value());
+                        odometryTable = rosTable->GetSubTable(import->FirstChildElement("source_topic")->GetText());
+                        RCLCPP_INFO(get_logger(), "Publishing odometry to %s", import->FirstChildElement("target_topic")->GetText());
                         odometryPublisher = create_publisher<Odometry>(
-                            string(import->FirstChildElement("target_topic")->Value()),
+                            string(import->FirstChildElement("target_topic")->GetText()),
                             10
                         );
-                        create_wall_timer(10ms, [&]() {
+                        odometryTimer = create_wall_timer(10ms, [&]() {
                             double timestamp = odometryTable->GetEntry("timestamp").GetDouble(0);
                             Odometry odom;
                             odom.header.frame_id = "odom";
@@ -90,6 +96,29 @@ namespace nfr_ros
                             broadcaster->sendTransform(transform);
                         });
                     }
+                    else if (string(import->Name()) == "go_to_pose")
+                    {
+                        const auto& table = rosTable->GetSubTable(import->FirstChildElement("source_topic")->GetText());
+                        const auto& publisher = create_publisher<PoseStamped>(import->FirstChildElement("target_topic")->GetText(),
+                            10);
+                        RCLCPP_INFO(get_logger(), "Publishing target pose to %s", import->FirstChildElement("target_topic")->GetText());
+                        instance.AddListener(table->GetEntry("send"), nt::EventFlags::kPublish,
+                        [&](const nt::Event& event) {
+                            std::scoped_lock lock(mutex);
+                            if (event.GetValueEventData()->value.GetBoolean() == true)
+                            {
+                                table->GetEntry("send").SetBoolean(false);
+                                PoseStamped pose;
+                                pose.pose.position.x = table->GetEntry("x").GetDouble(0);
+                                pose.pose.position.y = table->GetEntry("y").GetDouble(0);
+                                pose.pose.position.z = 0;
+                                Quaternion quaternion;
+                                quaternion.setRPY(0, 0, table->GetEntry("theta").GetDouble(0));
+                                tf2::convert(quaternion, pose.pose.orientation);
+                                publisher->publish(pose);
+                            }
+                        });
+                    }
                 }
                 for (auto _export = exports->FirstChildElement(); _export; _export = _export->NextSiblingElement())
                 {
@@ -101,10 +130,10 @@ namespace nfr_ros
                     {
                         if (string(_export->Attribute("isaac_ros")) == "false")
                         {
-                            string cameraName = _export->FirstChildElement("camera_name")->Value();
-                            const auto& detectorTable = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->Value());
+                            string cameraName = _export->FirstChildElement("camera_name")->GetText();
+                            const auto& detectorTable = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->GetText());
                             const auto& subscriber = create_subscription<AprilTagDetectionArray>(
-                                _export->FirstChildElement("source_topic")->Value(), 10, [&](const AprilTagDetectionArray& array) {
+                                _export->FirstChildElement("source_topic")->GetText(), 10, [&](const AprilTagDetectionArray& array) {
                                 double timestamp = array.header.stamp.nanosec;
                                 std::vector<long> ids;
                                 for (const auto& detection : array.detections)
@@ -146,9 +175,9 @@ namespace nfr_ros
                     }
                     else if (string(_export->Name()) == "pose")
                     {
-                        const auto& table = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->Value());
-                        string sourceFrame = _export->FirstChildElement("source_frame")->Value();
-                        string targetFrame = _export->FirstChildElement("target_frame")->Value();
+                        const auto& table = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->GetText());
+                        string sourceFrame = _export->FirstChildElement("source_frame")->GetText();
+                        string targetFrame = _export->FirstChildElement("target_frame")->GetText();
                         create_wall_timer(10ms, [&]() {
                             try
                             {

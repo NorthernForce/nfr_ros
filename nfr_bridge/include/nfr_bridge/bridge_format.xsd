@@ -39,6 +39,12 @@
                                 <xs:element name="target_topic" type="xs:string"/>
                             </xs:complexType>
                         </xs:element>
+                        <xs:element name="go_to_pose" minOccurs="0" maxOccurs="1">
+                            <xs:complexType>
+                                <xs:element name="source_topic" type="xs:string"/>
+                                <xs:element name="target_topic" type="xs:string"/>
+                            </xs:complexType>
+                        </xs:element>
                     </xs:all>
                 </xs:complexType>
             </xs:element>
