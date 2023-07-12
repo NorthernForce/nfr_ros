@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<bridge>
+    <exports>
+        <apriltag_detector isaac_ros="false">
+            <source_topic>/realsense/tag_detections</source_topic>
+            <target_topic>realsense</target_topic>
+            <camera_name>realsense</camera_name>
+        </apriltag_detector>
+    </exports>
+    <imports>
+        <odometry>
+            <source_topic>odometry</source_topic>
+            <target_topic>/odom</target_topic>
+        </odometry>
+        <go_to_pose>
+            <source_topic>go_to_pose_destination</source_topic>
+            <target_topic>go_to_pose_destination</target_topic>
+        </go_to_pose>
+    </imports>
+</bridge>
