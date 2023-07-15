@@ -38,6 +38,8 @@ namespace nfr_ros
         shared_ptr<TransformBroadcaster> broadcaster;
         shared_ptr<TransformListener> listener;
         shared_ptr<TransformBuffer> buffer;
+        vector<shared_ptr<Subscription<AprilTagDetectionArray>>> detectionSubs;
+        vector<shared_ptr<nt::NetworkTable>> detectionTables;
     public:
         NFRBridgeNode() : Node("nfr_bridge_node")
         {
@@ -69,7 +71,8 @@ namespace nfr_ros
                             string(import->FirstChildElement("target_topic")->GetText()),
                             10
                         );
-                        odometryTimer = create_wall_timer(10ms, [&]() {
+                        odometryTimer = create_wall_timer(10ms, [=]() {
+                            RCLCPP_INFO(get_logger(), "Publishing odometry");
                             double timestamp = odometryTable->GetEntry("timestamp").GetDouble(0);
                             Odometry odom;
                             odom.header.frame_id = "odom";
@@ -103,7 +106,7 @@ namespace nfr_ros
                             10);
                         RCLCPP_INFO(get_logger(), "Publishing target pose to %s", import->FirstChildElement("target_topic")->GetText());
                         instance.AddListener(table->GetEntry("send"), nt::EventFlags::kPublish,
-                        [&](const nt::Event& event) {
+                        [=](const nt::Event& event) {
                             std::scoped_lock lock(mutex);
                             if (event.GetValueEventData()->value.GetBoolean() == true)
                             {
@@ -132,8 +135,9 @@ namespace nfr_ros
                         {
                             string cameraName = _export->FirstChildElement("camera_name")->GetText();
                             const auto& detectorTable = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->GetText());
+                            detectionTables.emplace_back(detectorTable);
                             const auto& subscriber = create_subscription<AprilTagDetectionArray>(
-                                _export->FirstChildElement("source_topic")->GetText(), 10, [&](const AprilTagDetectionArray& array) {
+                                _export->FirstChildElement("source_topic")->GetText(), 10, [=](const AprilTagDetectionArray& array) {
                                 double timestamp = array.header.stamp.nanosec;
                                 std::vector<long> ids;
                                 for (const auto& detection : array.detections)
@@ -167,43 +171,44 @@ namespace nfr_ros
                                 detectorTable->GetEntry("timestamp").SetDouble(timestamp);
                                 detectorTable->GetEntry("ids").SetIntegerArray(ids);
                             });
+                            detectionSubs.emplace_back(subscriber);
                         }
                         else
                         {
                             RCLCPP_WARN(get_logger(), "Nvidia ISAAC ROS not supported at the moment.");
                         }
                     }
-                    else if (string(_export->Name()) == "pose")
-                    {
-                        const auto& table = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->GetText());
-                        string sourceFrame = _export->FirstChildElement("source_frame")->GetText();
-                        string targetFrame = _export->FirstChildElement("target_frame")->GetText();
-                        create_wall_timer(10ms, [&]() {
-                            try
-                            {
-                                TransformStamped transform = buffer->lookupTransform(
-                                    targetFrame,
-                                    sourceFrame,
-                                    tf2::TimePointZero
-                                );
-                                table->GetEntry("timestamp").SetDouble(transform.header.stamp.nanosec);
-                                table->GetEntry("x").SetDouble(transform.transform.translation.x);
-                                table->GetEntry("y").SetDouble(transform.transform.translation.y);
-                                table->GetEntry("z").SetDouble(transform.transform.translation.z);
-                                table->GetEntry("rotation").SetDoubleArray(std::vector<double>{
-                                    transform.transform.rotation.w,
-                                    transform.transform.rotation.x,
-                                    transform.transform.rotation.y,
-                                    transform.transform.rotation.z
-                                });
-                            }
-                            catch (tf2::LookupException& e)
-                            {
-                                RCLCPP_ERROR(get_logger(), "Could not find transform from %s to %s: %s",
-                                    sourceFrame, targetFrame, e.what());
-                            }
-                        });
-                    }
+                    // else if (string(_export->Name()) == "pose")
+                    // {
+                    //     const auto& table = rosTable->GetSubTable(_export->FirstChildElement("target_topic")->GetText());
+                    //     string sourceFrame = _export->FirstChildElement("source_frame")->GetText();
+                    //     string targetFrame = _export->FirstChildElement("target_frame")->GetText();
+                    //     create_wall_timer(10ms, [&]() {
+                    //         try
+                    //         {
+                    //             TransformStamped transform = buffer->lookupTransform(
+                    //                 targetFrame,
+                    //                 sourceFrame,
+                    //                 tf2::TimePointZero
+                    //             );
+                    //             table->GetEntry("timestamp").SetDouble(transform.header.stamp.nanosec);
+                    //             table->GetEntry("x").SetDouble(transform.transform.translation.x);
+                    //             table->GetEntry("y").SetDouble(transform.transform.translation.y);
+                    //             table->GetEntry("z").SetDouble(transform.transform.translation.z);
+                    //             table->GetEntry("rotation").SetDoubleArray(std::vector<double>{
+                    //                 transform.transform.rotation.w,
+                    //                 transform.transform.rotation.x,
+                    //                 transform.transform.rotation.y,
+                    //                 transform.transform.rotation.z
+                    //             });
+                    //         }
+                    //         catch (tf2::LookupException& e)
+                    //         {
+                    //             RCLCPP_ERROR(get_logger(), "Could not find transform from %s to %s: %s",
+                    //                 sourceFrame, targetFrame, e.what());
+                    //         }
+                    //     });
+                    // }
                 }
             }
         }

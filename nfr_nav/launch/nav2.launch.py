@@ -13,10 +13,10 @@ def generate_launch_description():
                     '/navigation_launch.py'
                 ]
             )
-        ),
-        Node(
-            package='nfr_nav',
-            executable='nfr_nav_node',
-            name='nfr_nav_node'
         )
+        # Node(
+        #     package='nfr_nav',
+        #     executable='nfr_nav_node',
+        #     name='nfr_nav_node'
+        # )
     ])

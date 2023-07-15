@@ -33,7 +33,9 @@ def generate_launch_description():
             executable='nfr_gps_node',
             name='nfr_gps_node',
             parameters=[{
-                'tag_poses': os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'field.json')
+                'tag_poses': os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'field.json'),
+                'detector_topics': ['realsense/detections'],
+                'camera_names': ['realsense']
             }]
         ),
         Node(
@@ -48,6 +50,46 @@ def generate_launch_description():
             package='realsense2_camera',
             executable='realsense2_camera_node',
             name='realsense',
-            remappings=[('image/color', 'image_raw')]
+            namespace='realsense',
+            remappings=[('color/image_raw', 'image'), ('color/camera_info', 'camera_info')]
+        ),
+        Node(
+            package='image_proc',
+            executable='image_proc',
+            name='rectify_node',
+            namespace='realsense'
+        ),
+        Node(
+            package='apriltag_ros',
+            executable='apriltag_node',
+            name='apriltag_node',
+            namespace='realsense',
+            parameters=[{
+                'family': '16h5',
+                'size': 0.18
+            }]
+        ),
+        Node(
+            package='robot_localization',
+            executable='ekf_node',
+            name='ekf_node',
+            parameters=[{
+                'odom0': 'odom',
+                'odom0_config': [
+                    True, True, False, False, False, True,
+                    True, True, False, False, False, True,
+                    False, False, False
+                ],
+                'pose0': 'apriltag_estimations',
+                'pose0_config': [
+                    True, True, True, True, True, True,
+                    False, False, False, False, False, False,
+                    False, False, False
+                ],
+                'map_frame': 'map',
+                'odom_frame': 'odom',
+                'world_frame': 'map',
+                'base_link_frame': 'base_link'
+            }]
         )
     ])
