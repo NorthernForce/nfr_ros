@@ -1,6 +1,7 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch.launch_description_sources import PythonLaunchDescriptionSource, AnyLaunchDescriptionSource
 from launch_ros.actions import Node, ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from ament_index_python.packages import get_package_share_directory
@@ -9,19 +10,30 @@ def generate_launch_description():
     with open(os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'squishy.urdf')) as f:
         robot_desc = f.read()
     navigation_launch = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                [
-                    os.path.join(get_package_share_directory('nav2_bringup'), 'launch'),
-                    '/navigation_launch.py'
-                ]
-            )
-        )
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory('nav2_bringup'), 'launch'),
+                '/navigation_launch.py'
+            ]
+        ),
+        launch_arguments=[('use_sim_time', 'True')]
+    )
+    rosbridge_launch = IncludeLaunchDescription(
+        AnyLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory('rosbridge_server'), 'launch'),
+                '/rosbridge_websocket_launch.xml'
+            ]
+        ),
+        launch_arguments=[('port', '5810')]
+    )
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
         parameters=[{
-            'robot_description': robot_desc
+            'robot_description': robot_desc,
+            'use_sim_time': True
         }]
     )
     rectify_node = ComposableNode(
@@ -32,6 +44,7 @@ def generate_launch_description():
         parameters=[{
             'output_width': 1920,
             'output_height': 1080,
+            'use_sim_time': True
         }]
     )
     realsense_node = ComposableNode(
@@ -45,6 +58,7 @@ def generate_launch_description():
             'enable_infra1': False,
             'enable_infra2': False,
             'enable_depth': False,
+            'use_sim_time': True
         }],
         remappings=[
             ('color/image_raw', 'image'),
@@ -58,7 +72,8 @@ def generate_launch_description():
         namespace='realsense',
         parameters=[{
             'family': '16h5',
-            'size': 0.18
+            'size': 0.18,
+            'use_sim_time': True
         }]
     )
     realsense_container = ComposableNodeContainer(
@@ -83,21 +98,39 @@ def generate_launch_description():
                 True, True, False, False, False, True,
                 False, False, False
             ],
+            'pose0': 'realsense_pose',
+            'pose0_config': [
+                True, True, True, True, True, True,
+                False, False, False, False, False, False,
+                False, False, False
+            ],
             'map_frame': 'map',
             'odom_frame': 'odom',
             'world_frame': 'map',
-            'base_link_frame': 'base_link'
+            'base_link_frame': 'base_link',
+            'use_sim_time': True
         }]
     )
-    squishy_node = Node(
-        package='nfr_charged_up',
-        executable='squishy_node',
-        name='squishy_node'
+    nfr_apriltag_node = Node(
+        package='nfr_apriltag',
+        executable='nfr_apriltag_node',
+        name='nfr_apriltag_node',
+        parameters=[{
+            'detections_topic': 'realsense/detections',
+            'use_sim_time': True
+        }]
+    )
+    nfr_odometry_node = Node(
+        package='nfr_odometry',
+        executable='nfr_odometry_node',
+        name='nfr_odometry_node'
     )
     return LaunchDescription([
         navigation_launch,
         robot_state_publisher,
         realsense_container,
         robot_localization,
-        squishy_node
+        rosbridge_launch,
+        nfr_apriltag_node,
+        nfr_odometry_node
     ])
