@@ -125,6 +125,16 @@ def generate_launch_description():
         executable='nfr_odometry_node',
         name='nfr_odometry_node'
     )
+    nfr_navigation_node = Node(
+        package='nfr_navigation',
+        executable='nfr_navigation_node',
+        name='nfr_navigation_node'
+    )
+    nfr_tf_bridge_node = Node(
+        package='nfr_tf_bridge',
+        executable='nfr_tf_bridge_node',
+        name='nfr_tf_bridge_node'
+    )
     return LaunchDescription([
         navigation_launch,
         robot_state_publisher,
@@ -132,5 +142,7 @@ def generate_launch_description():
         robot_localization,
         rosbridge_launch,
         nfr_apriltag_node,
-        nfr_odometry_node
+        nfr_odometry_node,
+        nfr_navigation_node,
+        nfr_tf_bridge_node
     ])
