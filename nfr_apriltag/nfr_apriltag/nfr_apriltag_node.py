@@ -1,9 +1,11 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
-from geometry_msgs.msg import TransformStamped, PoseWithCovarianceStamped, Transform, Quaternion
+from geometry_msgs.msg import PoseWithCovarianceStamped, Transform, Quaternion
 from tf2_ros import Buffer, TransformListener
 from apriltag_msgs.msg import AprilTagDetectionArray, AprilTagDetection
+from isaac_ros_apriltag_interfaces.msg import AprilTagDetectionArray as IsaacAprilTagDetectionArray
+from isaac_ros_apriltag_interfaces.msg import AprilTagDetection as IsaacAprilTagDetection
 import os
 from ament_index_python import get_package_share_directory
 import json
@@ -57,13 +59,18 @@ class NFRApriltagNode(Node):
                 tag_pose.rotation.y = tag['pose']['rotation']['quaternion']['Y']
                 tag_pose.rotation.z = tag['pose']['rotation']['quaternion']['Z']
                 self.field[tag['ID']] = tag_pose
+        self.use_cuda = self.declare_parameter('use_cuda', False).value
         self.camera_frame = self.declare_parameter('camera_frame', 'camera_link').value
         self.base_frame = self.declare_parameter('base_frame', 'base_link').value
         self.detections_topic = self.declare_parameter('detections_topic', 'detections').value
         self.pose_topic = self.declare_parameter('pose_topic', 'estimated_pose').value
         self.pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
-        self.detections_subscription = self.create_subscription(AprilTagDetectionArray, self.detections_topic,
-            self.detections_callback, 10)
+        if self.use_cuda:
+            self.detections_subscription = self.create_subscription(IsaacAprilTagDetectionArray, self.detections_topic,
+                self.cuda_detections_callback, 10)
+        else:
+            self.detections_subscription = self.create_subscription(AprilTagDetectionArray, self.detections_topic,
+                self.detections_callback, 10)
     def detections_callback(self, detections: AprilTagDetectionArray):
         for detection in detections.detections:
             detection: AprilTagDetection
@@ -83,6 +90,30 @@ class NFRApriltagNode(Node):
                 pose = PoseWithCovarianceStamped()
                 pose.header.frame_id = "map"
                 pose.header.stamp = self.get_clock().now()
+                pose.pose.pose.orientation = pose_transform.rotation
+                pose.pose.pose.position.x = pose_transform.translation.x
+                pose.pose.pose.position.y = pose_transform.translation.y
+                pose.pose.pose.position.z = pose_transform.translation.z
+                self.pose_publisher.publish(pose)
+    def cuda_detections_callback(self, detections: IsaacAprilTagDetectionArray):
+        for detection in detections.detections:
+            detection: IsaacAprilTagDetection
+            if detection.id in self.field.keys():
+                if not self.tf_buffer.can_transform(self.camera_frame, self.base_frame, Time()):
+                    self.get_logger().warn('Cannot transform %s to %s' % (self.base_frame, self.camera_frame))
+                    continue
+                base_to_camera = self.tf_buffer.lookup_transform(self.camera_frame, self.base_frame, Time())
+                camera_to_tag = Transform()
+                camera_to_tag.translation.x = detection.pose.pose.pose.position.x
+                camera_to_tag.translation.y = detection.pose.pose.pose.position.y
+                camera_to_tag.translation.z = detection.pose.pose.pose.position.z
+                camera_to_tag.rotation = detection.pose.pose.pose.orientation
+                world_to_tag = self.field[detection.id]
+                pose_transform = subtract_transforms(world_to_tag,
+                    add_transforms(camera_to_tag, base_to_camera.transform))
+                pose = PoseWithCovarianceStamped()
+                pose.header.frame_id = "map"
+                pose.header.stamp = self.get_clock().now().to_msg()
                 pose.pose.pose.orientation = pose_transform.rotation
                 pose.pose.pose.position.x = pose_transform.translation.x
                 pose.pose.pose.position.y = pose_transform.translation.y
