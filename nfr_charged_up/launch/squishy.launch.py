@@ -1,9 +1,7 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import IncludeLaunchDescription, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource, AnyLaunchDescriptionSource
-from launch_ros.actions import Node, ComposableNodeContainer
-from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 import os
 def generate_launch_description():
@@ -27,6 +25,30 @@ def generate_launch_description():
         ),
         launch_arguments=[('port', '5810')]
     )
+    # realsense_launch = GroupAction(
+    #     PushRosNamespace('realsense'),
+    #     IncludeLaunchDescription(
+    #         PythonLaunchDescriptionSource(
+    #             [
+    #                 os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
+    #                 '/realsense_apriltag.launch.py'
+    #             ]
+    #         )
+    #     )
+    # )
+    cuda_realsense_launch = GroupAction(
+        actions=[
+            PushRosNamespace('realsense'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
+                        '/cuda_realsense_apriltag.launch.py'
+                    ]
+                )
+            )
+        ]
+    )
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -35,57 +57,6 @@ def generate_launch_description():
             'robot_description': robot_desc,
             'use_sim_time': True
         }]
-    )
-    rectify_node = ComposableNode(
-        package='image_proc',
-        plugin='image_proc::RectifyNode',
-        name='realsense_rectify',
-        namespace='realsense',
-        parameters=[{
-            'output_width': 1920,
-            'output_height': 1080,
-            'use_sim_time': True
-        }]
-    )
-    realsense_node = ComposableNode(
-        package='realsense2_camera',
-        plugin='realsense2_camera::RealSenseNodeFactory',
-        name='realsense_camera',
-        namespace='realsense',
-        parameters=[{
-            'color_height': 1080,
-            'color_width': 1920,
-            'enable_infra1': False,
-            'enable_infra2': False,
-            'enable_depth': False,
-            'use_sim_time': True
-        }],
-        remappings=[
-            ('color/image_raw', 'image'),
-            ('color/camera_info', 'camera_info')
-        ]
-    )
-    apriltag_node = ComposableNode(
-        package='apriltag_ros',
-        plugin='AprilTagNode',
-        name='realsense_apriltag',
-        namespace='realsense',
-        parameters=[{
-            'family': '16h5',
-            'size': 0.18,
-            'use_sim_time': True
-        }]
-    )
-    realsense_container = ComposableNodeContainer(
-        package='rclcpp_components',
-        name='realsense_container',
-        namespace='realsense',
-        executable='component_container_mt',
-        composable_node_descriptions=[
-            rectify_node,
-            apriltag_node,
-            realsense_node,
-        ]
     )
     robot_localization = Node(
         package='robot_localization',
@@ -111,15 +82,6 @@ def generate_launch_description():
             'use_sim_time': True
         }]
     )
-    nfr_apriltag_node = Node(
-        package='nfr_apriltag',
-        executable='nfr_apriltag_node',
-        name='nfr_apriltag_node',
-        parameters=[{
-            'detections_topic': 'realsense/detections',
-            'use_sim_time': True
-        }]
-    )
     nfr_odometry_node = Node(
         package='nfr_odometry',
         executable='nfr_odometry_node',
@@ -138,11 +100,10 @@ def generate_launch_description():
     return LaunchDescription([
         navigation_launch,
         robot_state_publisher,
-        realsense_container,
         robot_localization,
         rosbridge_launch,
-        nfr_apriltag_node,
         nfr_odometry_node,
         nfr_navigation_node,
-        nfr_tf_bridge_node
+        nfr_tf_bridge_node,
+        cuda_realsense_launch
     ])
