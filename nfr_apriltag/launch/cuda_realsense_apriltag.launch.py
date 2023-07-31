@@ -4,7 +4,7 @@ from launch import LaunchDescription
 def generate_launch_description():
     rectify_node = ComposableNode(
         package='isaac_ros_image_proc',
-        plugin='isaac_ros::image_proc::RectifyNode',
+        plugin='nvidia::isaac_ros::image_proc::RectifyNode',
         name='realsense_rectify',
         namespace='',
         parameters=[{
@@ -33,7 +33,7 @@ def generate_launch_description():
     )
     apriltag_node = ComposableNode(
         package='isaac_ros_apriltag',
-        plugin='isaac_ros::apriltag::AprilTagNode',
+        plugin='nvidia::isaac_ros::apriltag::AprilTagNode',
         name='realsense_apriltag',
         namespace='',
         parameters=[{
