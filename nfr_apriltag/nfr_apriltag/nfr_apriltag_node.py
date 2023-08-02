@@ -38,6 +38,16 @@ def subtract_transforms(a: Transform, b: Transform):
     c.translation.z = a.translation.z - b.translation.z
     c.rotation = add_quaternions(a.rotation, inverse_quaternion(b.rotation))
     return c
+def calculate_tag_area(coordinates):
+    x0 = coordinates[0].x
+    y0 = coordinates[0].y
+    x1 = coordinates[1].x
+    y1 = coordinates[1].y
+    x2 = coordinates[2].x
+    y2 = coordinates[2].y
+    x3 = coordinates[3].x
+    y3 = coordinates[3].y
+    return 0.5 * (x0 * y1 - y0 * x1 + x1 * y2 - y1 * x2 + x2 * y3 - y2 * x3 + x3 * y0 - y3 * x0)
 class NFRApriltagNode(Node):
     def __init__(self):
         super().__init__('nfr_apriltag_node')
@@ -97,8 +107,10 @@ class NFRApriltagNode(Node):
                 self.pose_publisher.publish(pose)
     def cuda_detections_callback(self, detections: IsaacAprilTagDetectionArray):
         for detection in detections.detections:
+            area = calculate_tag_area(detection.corners)
+            self.get_logger().info('Detected tag #%d. Area: %f' % (detection.id, area))
             detection: IsaacAprilTagDetection
-            if detection.id in self.field.keys():
+            if detection.id in self.field.keys() and area > 2200.0:
                 if not self.tf_buffer.can_transform(self.camera_frame, self.base_frame, Time()):
                     self.get_logger().warn('Cannot transform %s to %s' % (self.base_frame, self.camera_frame))
                     continue
@@ -119,6 +131,8 @@ class NFRApriltagNode(Node):
                 pose.pose.pose.position.y = pose_transform.translation.y
                 pose.pose.pose.position.z = pose_transform.translation.z
                 self.pose_publisher.publish(pose)
+        else:
+            self.get_logger().info("Bad tag detection rejected")
 def main(args=None):
     rclpy.init(args=args)
     apriltag_node = NFRApriltagNode()

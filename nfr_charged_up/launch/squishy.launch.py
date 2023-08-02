@@ -14,7 +14,28 @@ def generate_launch_description():
                 '/navigation_launch.py'
             ]
         ),
-        launch_arguments=[('use_sim_time', 'True')]
+        launch_arguments=[
+            ('use_sim_time', 'True'),
+            ('params_file', os.path.join(get_package_share_directory('nfr_navigation'), 'config', 'squishy_nav2_params.yaml'))
+        ]
+    )
+    map_yaml_file = os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'map.yaml')
+    map_node = Node(
+        package='nav2_map_server',
+        executable='map_server',
+        name='map_server',
+        parameters=[{
+            'yaml_filename': map_yaml_file
+        }]
+    )
+    lifecycle_map_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_map_manager',
+        parameters=[{
+            'autostart': True,
+            'node_names': ['map_server']
+        }]
     )
     rosbridge_launch = IncludeLaunchDescription(
         AnyLaunchDescriptionSource(
@@ -23,19 +44,8 @@ def generate_launch_description():
                 '/rosbridge_websocket_launch.xml'
             ]
         ),
-        launch_arguments=[('port', '5810')]
+        launch_arguments=[('port', '5809')]
     )
-    # realsense_launch = GroupAction(
-    #     PushRosNamespace('realsense'),
-    #     IncludeLaunchDescription(
-    #         PythonLaunchDescriptionSource(
-    #             [
-    #                 os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-    #                 '/realsense_apriltag.launch.py'
-    #             ]
-    #         )
-    #     )
-    # )
     cuda_realsense_launch = GroupAction(
         actions=[
             PushRosNamespace('realsense'),
@@ -79,7 +89,8 @@ def generate_launch_description():
             'odom_frame': 'odom',
             'world_frame': 'map',
             'base_link_frame': 'base_link',
-            'use_sim_time': True
+            'use_sim_time': True,
+            'debug': True
         }]
     )
     nfr_odometry_node = Node(
@@ -99,6 +110,8 @@ def generate_launch_description():
     )
     return LaunchDescription([
         navigation_launch,
+        map_node,
+        lifecycle_map_node,
         robot_state_publisher,
         robot_localization,
         rosbridge_launch,
