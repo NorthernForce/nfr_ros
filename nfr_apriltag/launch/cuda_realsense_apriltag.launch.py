@@ -8,8 +8,8 @@ def generate_launch_description():
         name='realsense_rectify',
         namespace='',
         parameters=[{
-            'output_width': 1920,
-            'output_height': 1080,
+            'output_width': 1280,
+            'output_height': 720,
             'use_sim_time': True
         }]
     )
@@ -19,8 +19,8 @@ def generate_launch_description():
         name='realsense_camera',
         namespace='',
         parameters=[{
-            'color_height': 1080,
-            'color_width': 1920,
+            'color_height': 720,
+            'color_width': 1280,
             'enable_infra1': False,
             'enable_infra2': False,
             'enable_depth': False,

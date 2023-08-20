@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.publisher import Publisher
+from rclpy.qos import qos_profile_sensor_data
 from nfr_tf_bridge_msgs.srv import LookupTransform
 from nfr_tf_bridge_msgs.msg import RequestTransform
 from tf2_ros.buffer import Buffer
@@ -26,7 +27,7 @@ class NFRTFBridgeNode(Node):
         return response
     def request_transform(self, request: RequestTransform):
         self.transform_publishers[request.publish_topic] = self.create_publisher(TransformStamped, request.publish_topic,
-            10)
+            qos_profile_sensor_data)
         self.transform_timers[request.publish_topic] = self.create_timer(1.0 / request.frequency, lambda :
             self.publish_transform(request))
     def publish_transform(self, request: RequestTransform):

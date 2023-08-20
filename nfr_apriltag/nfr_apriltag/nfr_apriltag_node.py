@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
+from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import PoseWithCovarianceStamped, Transform, Quaternion
 from tf2_ros import Buffer, TransformListener
 from apriltag_msgs.msg import AprilTagDetectionArray, AprilTagDetection
@@ -9,6 +10,7 @@ from isaac_ros_apriltag_interfaces.msg import AprilTagDetection as IsaacAprilTag
 import os
 from ament_index_python import get_package_share_directory
 import json
+import numpy as np
 def add_quaternions(a: Quaternion, b: Quaternion):
     c = Quaternion()
     c.w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
@@ -48,6 +50,20 @@ def calculate_tag_area(coordinates):
     x3 = coordinates[3].x
     y3 = coordinates[3].y
     return 0.5 * (x0 * y1 - y0 * x1 + x1 * y2 - y1 * x2 + x2 * y3 - y2 * x3 + x3 * y0 - y3 * x0)
+def euler_from_quaternion(quaternion: Quaternion):
+    x = quaternion.x
+    y = quaternion.y
+    z = quaternion.z
+    w = quaternion.w
+    sinr_cosp = 2 * (w * x + y * z)
+    cosr_cosp = 1 - 2 * (x * x + y * y)
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+    sinp = 2 * (w * y - z * x)
+    pitch = np.arcsin(sinp)
+    siny_cosp = 2 * (w * z + x * y)
+    cosy_cosp = 1 - 2 * (y * y + z * z)
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+    return roll, pitch, yaw
 class NFRApriltagNode(Node):
     def __init__(self):
         super().__init__('nfr_apriltag_node')
@@ -70,36 +86,37 @@ class NFRApriltagNode(Node):
                 tag_pose.rotation.z = tag['pose']['rotation']['quaternion']['Z']
                 self.field[tag['ID']] = tag_pose
         self.use_cuda = self.declare_parameter('use_cuda', False).value
-        self.camera_frame = self.declare_parameter('camera_frame', 'camera_link').value
         self.base_frame = self.declare_parameter('base_frame', 'base_link').value
         self.detections_topic = self.declare_parameter('detections_topic', 'detections').value
         self.pose_topic = self.declare_parameter('pose_topic', 'estimated_pose').value
+        self.area_threshold = self.declare_parameter('area_threshold', 400).value
         self.pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
         if self.use_cuda:
             self.detections_subscription = self.create_subscription(IsaacAprilTagDetectionArray, self.detections_topic,
-                self.cuda_detections_callback, 10)
+                self.cuda_detections_callback, qos_profile_sensor_data)
         else:
             self.detections_subscription = self.create_subscription(AprilTagDetectionArray, self.detections_topic,
-                self.detections_callback, 10)
+                self.detections_callback, qos_profile_sensor_data)
     def detections_callback(self, detections: AprilTagDetectionArray):
+        camera_frame = detections.header.frame_id
         for detection in detections.detections:
             detection: AprilTagDetection
             if detection.id in self.field.keys():
                 tag_frame = '%s:%d' % (detection.family, detection.id)
-                if not self.tf_buffer.can_transform(tag_frame, self.camera_frame, Time()):
-                    self.get_logger().warn('Cannot transform %s to %s' % (self.camera_frame, tag_frame))
+                if not self.tf_buffer.can_transform(tag_frame, camera_frame, Time()):
+                    self.get_logger().warn('Cannot transform %s to %s' % (camera_frame, tag_frame))
                     continue
-                camera_to_tag = self.tf_buffer.lookup_transform(tag_frame, self.camera_frame, Time())
-                if not self.tf_buffer.can_transform(self.camera_frame, self.base_frame, Time()):
-                    self.get_logger().warn('Cannot transform %s to %s' % (self.base_frame, self.camera_frame))
+                camera_to_tag = self.tf_buffer.lookup_transform(tag_frame, camera_frame, Time())
+                if not self.tf_buffer.can_transform(camera_frame, self.base_frame, Time()):
+                    self.get_logger().warn('Cannot transform %s to %s' % (self.base_frame, camera_frame))
                     continue
-                base_to_camera = self.tf_buffer.lookup_transform(self.camera_frame, self.base_frame, Time())
+                base_to_camera = self.tf_buffer.lookup_transform(camera_frame, self.base_frame, Time())
                 world_to_tag = self.field[detection.id]
                 pose_transform = subtract_transforms(world_to_tag,
                     add_transforms(camera_to_tag.transform, base_to_camera.transform))
                 pose = PoseWithCovarianceStamped()
                 pose.header.frame_id = "map"
-                pose.header.stamp = self.get_clock().now()
+                pose.header.stamp = detections.header.stamp
                 pose.pose.pose.orientation = pose_transform.rotation
                 pose.pose.pose.position.x = pose_transform.translation.x
                 pose.pose.pose.position.y = pose_transform.translation.y
@@ -110,7 +127,7 @@ class NFRApriltagNode(Node):
             area = calculate_tag_area(detection.corners)
             self.get_logger().info('Detected tag #%d. Area: %f' % (detection.id, area))
             detection: IsaacAprilTagDetection
-            if detection.id in self.field.keys() and area > 2200.0:
+            if detection.id in self.field.keys() and area > self.area_threshold:
                 if not self.tf_buffer.can_transform(self.camera_frame, self.base_frame, Time()):
                     self.get_logger().warn('Cannot transform %s to %s' % (self.base_frame, self.camera_frame))
                     continue
@@ -123,16 +140,19 @@ class NFRApriltagNode(Node):
                 world_to_tag = self.field[detection.id]
                 pose_transform = subtract_transforms(world_to_tag,
                     add_transforms(camera_to_tag, base_to_camera.transform))
+                yaw = euler_from_quaternion(pose_transform.rotation)[2]
+                self.get_logger().info('Estimated Pose to be [%f, %f] with a yaw of %f' % (pose_transform.translation.x,
+                    pose_transform.translation.y, yaw))
                 pose = PoseWithCovarianceStamped()
-                pose.header.frame_id = "map"
+                pose.header.frame_id = 'map'
                 pose.header.stamp = self.get_clock().now().to_msg()
                 pose.pose.pose.orientation = pose_transform.rotation
                 pose.pose.pose.position.x = pose_transform.translation.x
                 pose.pose.pose.position.y = pose_transform.translation.y
                 pose.pose.pose.position.z = pose_transform.translation.z
                 self.pose_publisher.publish(pose)
-        else:
-            self.get_logger().info("Bad tag detection rejected")
+            else:
+                self.get_logger().info('Bad tag detection rejected')
 def main(args=None):
     rclpy.init(args=args)
     apriltag_node = NFRApriltagNode()
