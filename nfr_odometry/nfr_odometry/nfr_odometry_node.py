@@ -14,9 +14,11 @@ class NFROdometryNode(Node):
         self.tf_timer = self.create_timer(0.05, self.publish_tf)
         self.odom_to_base_link = None
     def odometry_callback(self, odometry: Odometry):
-        self.get_logger().info('Recieved odometry message from time %d.%d. Current time is %d.%d' % 
-            (odometry.header.stamp.sec, odometry.header.stamp.nanosec, self.get_clock().now().seconds_nanoseconds()[0],
-                self.get_clock().now().seconds_nanoseconds()[1]))
+        odometry_time = odometry.header.stamp.sec + odometry.header.stamp.nanosec / 1.0e+9
+        current_stamp = self.get_clock().now().to_msg()
+        current_time = current_stamp.sec + current_stamp.nanosec / 1.0e+9
+        if abs(current_time - odometry_time) > 1:
+            self.get_logger().warn('Recieved odometry message that is over one second late')
         if self.odom_to_base_link is None:
             self.odom_to_base_link = TransformStamped()
         self.odom_to_base_link.header = odometry.header

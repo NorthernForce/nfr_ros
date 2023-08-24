@@ -18,24 +18,24 @@ def generate_launch_description():
     #         ('use_sim_time', 'True')
     #     ]
     # )
-    # map_yaml_file = os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'map.yaml')
-    # map_node = Node(
-    #     package='nav2_map_server',
-    #     executable='map_server',
-    #     name='map_server',
-    #     parameters=[{
-    #         'yaml_filename': map_yaml_file
-    #     }]
-    # )
-    # lifecycle_map_node = Node(
-    #     package='nav2_lifecycle_manager',
-    #     executable='lifecycle_manager',
-    #     name='lifecycle_map_manager',
-    #     parameters=[{
-    #         'autostart': True,
-    #         'node_names': ['map_server']
-    #     }]
-    # )
+    map_yaml_file = os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'map.yaml')
+    map_node = Node(
+        package='nav2_map_server',
+        executable='map_server',
+        name='map_server',
+        parameters=[{
+            'yaml_filename': map_yaml_file
+        }]
+    )
+    lifecycle_map_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_map_manager',
+        parameters=[{
+            'autostart': True,
+            'node_names': ['map_server']
+        }]
+    )
     rosbridge_launch = IncludeLaunchDescription(
         AnyLaunchDescriptionSource(
             [
@@ -73,6 +73,17 @@ def generate_launch_description():
         name='ekf_node',
         parameters=[{
             'odom0': 'odom',
+            'odom0_config': [
+                True, True, False, False, False, True,
+                True, True, False, False, False, True,
+                False, False, False
+            ],
+            'pose0': '/realsense/pose_estimations',
+            'pose0_config': [
+                True, True, False, False, False, True,
+                False, False, False, False, False, False,
+                False, False, False
+            ],
             'world_frame': 'map',
         }]
     )
@@ -97,5 +108,7 @@ def generate_launch_description():
         realsense_launch,
         nfr_tf_bridge_node,
         nfr_odometry_node,
-        robot_localization
+        robot_localization,
+        map_node,
+        lifecycle_map_node
     ])

@@ -49,7 +49,7 @@ def calculate_tag_area(coordinates):
     y2 = coordinates[2].y
     x3 = coordinates[3].x
     y3 = coordinates[3].y
-    return 0.5 * (x0 * y1 - y0 * x1 + x1 * y2 - y1 * x2 + x2 * y3 - y2 * x3 + x3 * y0 - y3 * x0)
+    return abs(0.5 * (x0 * y1 - y0 * x1 + x1 * y2 - y1 * x2 + x2 * y3 - y2 * x3 + x3 * y0 - y3 * x0))
 def euler_from_quaternion(quaternion: Quaternion):
     x = quaternion.x
     y = quaternion.y
@@ -89,7 +89,8 @@ class NFRApriltagNode(Node):
         self.base_frame = self.declare_parameter('base_frame', 'base_link').value
         self.detections_topic = self.declare_parameter('detections_topic', 'detections').value
         self.pose_topic = self.declare_parameter('pose_topic', 'estimated_pose').value
-        self.area_threshold = self.declare_parameter('area_threshold', 400).value
+        self.area_threshold = self.declare_parameter('area_threshold', 400.0).value
+        self.decision_margin_threshold = self.declare_parameter('decision_margin_threshold', 20.0).value
         self.pose_publisher = self.create_publisher(PoseWithCovarianceStamped, self.pose_topic, 10)
         if self.use_cuda:
             self.detections_subscription = self.create_subscription(IsaacAprilTagDetectionArray, self.detections_topic,
@@ -101,6 +102,14 @@ class NFRApriltagNode(Node):
         camera_frame = detections.header.frame_id
         for detection in detections.detections:
             detection: AprilTagDetection
+            area = calculate_tag_area(detection.corners)
+            self.get_logger().info('Detected tag #%d. Area: %f' % (detection.id, area))
+            self.get_logger().info('Tag goodness: %f' % detection.goodness)
+            self.get_logger().info('Tag hamming: %d' % detection.hamming)
+            self.get_logger().info('Tag decision margin: %f' % detection.decision_margin)
+            if detection.decision_margin < self.decision_margin_threshold:
+                self.get_logger().warn('Rejecting bad tag detection')
+                continue
             if detection.id in self.field.keys():
                 tag_frame = '%s:%d' % (detection.family, detection.id)
                 if not self.tf_buffer.can_transform(tag_frame, camera_frame, Time()):
@@ -115,7 +124,7 @@ class NFRApriltagNode(Node):
                 pose_transform = subtract_transforms(world_to_tag,
                     add_transforms(camera_to_tag.transform, base_to_camera.transform))
                 pose = PoseWithCovarianceStamped()
-                pose.header.frame_id = "map"
+                pose.header.frame_id = 'map'
                 pose.header.stamp = detections.header.stamp
                 pose.pose.pose.orientation = pose_transform.rotation
                 pose.pose.pose.position.x = pose_transform.translation.x
