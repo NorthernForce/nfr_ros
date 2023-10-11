@@ -3,6 +3,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from nav2_msgs.action import NavigateToPose
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import TwistStamped
 class NFRNavigationNode(Node):
     def __init__(self):
         super().__init__('nfr_navigation_node')
@@ -11,12 +12,16 @@ class NFRNavigationNode(Node):
         self.target_pose_topic = self.declare_parameter('target_pose_topic', 'target_pose').value
         self.target_pose_subscription = self.create_subscription(PoseStamped, self.target_pose_topic,
             self.target_pose_callback, 10)
+        self.cmd_vel_nav_subscription = self.create_subscription(TwistStamped, '/cmd_vel_nav', self.cmd_vel_nav_callback, 10)
     def target_pose_callback(self, target_pose: PoseStamped):
         go_to_pose_goal = NavigateToPose.Goal()
         go_to_pose_goal.pose = target_pose
         go_to_pose_goal.behavior_tree = ''
         self.go_to_pose_client.wait_for_server()
         self.go_to_pose_client.send_goal_async(go_to_pose_goal)
+    def cmd_vel_nav_callback(self, cmd_vel_nav: TwistStamped):
+        self.get_logger().info('Recieving nav2 target velocities of %d, %d, %d' % (cmd_vel_nav.twist.linear.x, cmd_vel_nav.twist.linear.y,
+            cmd_vel_nav.twist.angular.z))
 def main(args=None):
     rclpy.init(args=args)
     navigation_node = NFRNavigationNode()

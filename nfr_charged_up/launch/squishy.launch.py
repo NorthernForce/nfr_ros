@@ -7,17 +7,17 @@ import os
 def generate_launch_description():
     with open(os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'squishy.urdf')) as f:
         robot_desc = f.read()
-    # navigation_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         [
-    #             os.path.join(get_package_share_directory('nav2_bringup'), 'launch'),
-    #             '/navigation_launch.py'
-    #         ]
-    #     ),
-    #     launch_arguments=[
-    #         ('use_sim_time', 'True')
-    #     ]
-    # )
+    navigation_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory('nav2_bringup'), 'launch'),
+                '/navigation_launch.py'
+            ]
+        ),
+        launch_arguments=[
+            ('use_sim_time', 'True')
+        ]
+    )
     map_yaml_file = os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'map.yaml')
     map_node = Node(
         package='nav2_map_server',
@@ -52,7 +52,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     [
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                        '/realsense_apriltag.launch.py'
+                        '/cuda_realsense_apriltag.launch.py'
                     ]
                 )
             )
@@ -92,11 +92,11 @@ def generate_launch_description():
         executable='nfr_odometry_node',
         name='nfr_odometry_node'
     )
-    # nfr_navigation_node = Node(
-    #     package='nfr_navigation',
-    #     executable='nfr_navigation_node',
-    #     name='nfr_navigation_node'
-    # )
+    nfr_navigation_node = Node(
+        package='nfr_navigation',
+        executable='nfr_navigation_node',
+        name='nfr_navigation_node'
+    )
     nfr_tf_bridge_node = Node(
         package='nfr_tf_bridge',
         executable='nfr_tf_bridge_node',
@@ -108,7 +108,9 @@ def generate_launch_description():
         realsense_launch,
         nfr_tf_bridge_node,
         nfr_odometry_node,
-        robot_localization,
+        # robot_localization,
         map_node,
-        lifecycle_map_node
+        lifecycle_map_node,
+        nfr_navigation_node,
+        # navigation_launch
     ])

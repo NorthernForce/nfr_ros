@@ -19,6 +19,7 @@ class NFROdometryNode(Node):
         current_time = current_stamp.sec + current_stamp.nanosec / 1.0e+9
         if abs(current_time - odometry_time) > 1:
             self.get_logger().warn('Recieved odometry message that is over one second late')
+            self.get_logger().warn('%f vs %f' % (odometry_time, current_time))
         if self.odom_to_base_link is None:
             self.odom_to_base_link = TransformStamped()
         self.odom_to_base_link.header = odometry.header
