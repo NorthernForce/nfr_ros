@@ -1,4 +1,4 @@
-<robot name="squishy">
+<robot name="swervy">
     <link name="base_link"/>
     <link name="camera_link"/>
     <joint name="realsense_joint" type="fixed">

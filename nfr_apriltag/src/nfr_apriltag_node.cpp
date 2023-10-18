@@ -28,7 +28,6 @@ namespace nfr
     public:
         AprilTagLocalizationNode(const rclcpp::NodeOptions& options) : rclcpp::Node("nfr_apriltag_localization_node", options)
         {
-            RCLCPP_INFO(get_logger(), "Hello World!");
             subscription = create_subscription<AprilTagDetectionArray>("tag_detections", rclcpp::SensorDataQoS(),
                 std::bind(&AprilTagLocalizationNode::detectionCallback, this, _1));
             publisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_estimations", rclcpp::SensorDataQoS());

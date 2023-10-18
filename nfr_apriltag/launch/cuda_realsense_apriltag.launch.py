@@ -78,9 +78,9 @@ def generate_launch_description():
         ]
     )
     return LaunchDescription([
-        realsense_container,
         tag_size_argument,
         resolution_width_argument,
         resolution_height_argument,
-        field_path_argument
+        field_path_argument,
+        realsense_container
     ])

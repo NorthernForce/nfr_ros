@@ -1,10 +1,9 @@
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
+from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch import LaunchDescription
-from ament_index_python import get_package_share_directory
-import os
 def generate_launch_description():
     tag_size = LaunchConfiguration('tag_size')
     resolution_width = LaunchConfiguration('resolution_width')
@@ -19,8 +18,7 @@ def generate_launch_description():
     camera_path_argument = DeclareLaunchArgument('camera_path', default_value='/dev/video0')
     frame_id_argument = DeclareLaunchArgument('frame_id', default_value='camera')
     camera_info_url_argument = DeclareLaunchArgument('camera_info_url', default_value='')
-    field_path_argument = DeclareLaunchArgument('field_path',
-        default_value=os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'field.json'))
+    field_path_argument = DeclareLaunchArgument('field_path', default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'), 'config', 'field.json')))
     rectify_node = ComposableNode(
         package='isaac_ros_image_proc',
         plugin='nvidia::isaac_ros::image_proc::RectifyNode',
@@ -82,12 +80,12 @@ def generate_launch_description():
         ]
     )
     return LaunchDescription([
-        usb_container,
         tag_size_argument,
         resolution_width_argument,
         resolution_height_argument,
         camera_path_argument,
         frame_id_argument,
         camera_info_url_argument,
-        field_path_argument
+        field_path_argument,
+        usb_container
     ])
