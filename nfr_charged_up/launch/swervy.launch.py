@@ -27,10 +27,7 @@ def generate_launch_description():
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
                         '/cuda_realsense_apriltag.launch.py'
                     ]
-                ),
-                launch_arguments=[
-                    ('params_file', os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'swervy_nav2.yaml'))
-                ]
+                )
             )
         ]
     )
@@ -49,7 +46,10 @@ def generate_launch_description():
                 os.path.join(get_package_share_directory('nfr_navigation'), 'launch'),
                 '/navigation.launch.py'
             ]
-        )
+        ),
+        launch_arguments=[
+            ('params_file', os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'swervy_nav2.yaml'))
+        ]
     )
     local_localization = Node(
         package='robot_localization',
