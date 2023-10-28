@@ -1,4 +1,0 @@
-float64 frequency
-string base_frame
-string child_frame
-string publish_topic
