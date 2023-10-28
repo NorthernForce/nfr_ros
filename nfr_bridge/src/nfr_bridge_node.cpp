@@ -18,7 +18,8 @@ namespace nfr
     private:
         nt::NetworkTableInstance instance;
         std::shared_ptr<nt::NetworkTable> table, odometryTable, targetPoseTable, cmdVelTable;
-        nt::DoubleSubscriber odometryX, odometryY, odometryTheta, targetPoseX, targetPoseY, targetPoseTheta;
+        nt::DoubleSubscriber odometryX, odometryY, odometryTheta, odometryDeltaX, odometryDeltaY, odometryDeltaTheta, targetPoseX, targetPoseY,
+            targetPoseTheta;
         nt::DoublePublisher cmdVelX, cmdVelY, cmdVelTheta;
         nt::IntegerSubscriber odometryStamp, targetPoseStamp;
         nt::BooleanEntry targetPoseCancel;
@@ -37,11 +38,17 @@ namespace nfr
             odometryX = odometryTable->GetDoubleTopic("x").Subscribe(0.0);
             odometryY = odometryTable->GetDoubleTopic("y").Subscribe(0.0);
             odometryTheta = odometryTable->GetDoubleTopic("theta").Subscribe(0.0);
+            odometryDeltaX = odometryTable->GetDoubleTopic("vx").Subscribe(0.0);
+            odometryDeltaX = odometryTable->GetDoubleTopic("vy").Subscribe(0.0);
+            odometryDeltaX = odometryTable->GetDoubleTopic("vtheta").Subscribe(0.0);
             odometryStamp = odometryTable->GetIntegerTopic("stamp").Subscribe(0);
             odometrySubscriber = nt::MultiSubscriber(instance, {{
                 tableName + "/odometry/x",
                 tableName + "/odometry/y",
                 tableName + "/odometry/theta",
+                tableName + "/odometry/dx",
+                tableName + "/odometry/dy",
+                tableName + "/odometry/dtheta",
                 tableName + "/odometry/stamp"
             }});
             instance.AddListener(odometrySubscriber, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
@@ -67,7 +74,7 @@ namespace nfr
             cmdVelTheta = cmdVelTable->GetDoubleTopic("theta").Publish();
             cmdVelSusbscription = create_subscription<geometry_msgs::msg::Twist>("cmd_vel", 10,
                 std::bind(&NFRBridgeNode::cmdVelCallback, this, std::placeholders::_1));
-            instance.SetServerTeam(172);
+            instance.SetServer("localhost", 5810);
             instance.StartClient4("xavier");
             RCLCPP_INFO(get_logger(), "Started NT client4 as 'xavier'");
         }
@@ -80,6 +87,9 @@ namespace nfr
             odometry.header.stamp = rclcpp::Time((timestamp - (std::chrono::microseconds)instance.GetServerTimeOffset().value()).count());
             odometry.pose.pose.position.x = odometryX.Get();
             odometry.pose.pose.position.y = odometryY.Get();
+            odometry.twist.twist.linear.x = odometryDeltaX.Get();
+            odometry.twist.twist.linear.y = odometryDeltaY.Get();
+            odometry.twist.twist.angular.z = odometryDeltaTheta.Get();
             tf2::Quaternion quaternion;
             quaternion.setRPY(0, 0, odometryTheta.Get());
             odometry.pose.pose.orientation = tf2::toMsg(quaternion);
@@ -91,7 +101,7 @@ namespace nfr
             nav2_msgs::action::NavigateToPose::Goal goal;
             goal.behavior_tree = "";
             goal.pose.header.frame_id = "map";
-            std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)odometryStamp.Get();
+            std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)targetPoseStamp.Get();
             goal.pose.header.stamp = rclcpp::Time((timestamp - (std::chrono::microseconds)instance.GetServerTimeOffset().value()).count());
             goal.pose.pose.position.x = targetPoseX.Get();
             goal.pose.pose.position.y = targetPoseY.Get();
