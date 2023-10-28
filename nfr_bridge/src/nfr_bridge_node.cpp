@@ -87,6 +87,7 @@ namespace nfr
         }
         void recieveTargetPose(const nt::Event& event)
         {
+            RCLCPP_INFO(get_logger(), "Setting target pose");
             nav2_msgs::action::NavigateToPose::Goal goal;
             goal.behavior_tree = "";
             goal.pose.header.frame_id = "map";
@@ -104,6 +105,7 @@ namespace nfr
         {
             if (targetPoseCancel.Get())
             {
+                RCLCPP_INFO(get_logger(), "Cancelling goal");
                 navigateToPoseClient->async_cancel_all_goals();
                 targetPoseCancel.Set(false);
             }
