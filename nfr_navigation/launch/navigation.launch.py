@@ -18,7 +18,7 @@ def generate_launch_description():
     autostart_argument = DeclareLaunchArgument('autostart', default_value='True')
     params_file_argument = DeclareLaunchArgument('params_file',
         default_value=PathJoinSubstitution((FindPackageShare('nav2_bringup'), 'params', 'nav2_params.yaml')))
-    use_sim_time_argument = DeclareLaunchArgument('use_sim_time', default_value='True')
+    use_sim_time_argument = DeclareLaunchArgument('use_sim_time', default_value='False')
     map_file_argument = DeclareLaunchArgument('map_file',
         default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'), 'config', 'map.yaml')))
     configured_params = ParameterFile(
@@ -112,15 +112,6 @@ def generate_launch_description():
             'node_names': ['map_server']
         }]
     )
-    nfr_navigation_node = Node(
-        package='nfr_navigation',
-        executable='nfr_navigation_node',
-        name='nfr_navigation_node',
-        parameters=[{
-            'use_sim_time': use_sim_time
-        }],
-        remappings=remappings
-    )
     return LaunchDescription([
         autostart_argument,
         params_file_argument,
@@ -161,6 +152,5 @@ def generate_launch_description():
                     ]
                 )
             ]
-        ),
-        nfr_navigation_node
+        )
     ])

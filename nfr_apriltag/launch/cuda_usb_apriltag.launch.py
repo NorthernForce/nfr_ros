@@ -26,8 +26,7 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'output_width': resolution_width,
-            'output_height': resolution_height,
-            'use_sim_time': True
+            'output_height': resolution_height
         }]
     )
     usb_node = ComposableNode(
@@ -50,8 +49,7 @@ def generate_launch_description():
         name='usb_apriltag',
         namespace='',
         parameters=[{
-            'size': tag_size,
-            'use_sim_time': True
+            'size': tag_size
         }],
         remappings=[
             ('camera/image_rect', 'image_rect'),

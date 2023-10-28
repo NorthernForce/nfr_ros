@@ -20,8 +20,7 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'output_width': resolution_width,
-            'output_height': resolution_height,
-            'use_sim_time': True
+            'output_height': resolution_height
         }]
     )
     realsense_node = ComposableNode(
@@ -34,8 +33,7 @@ def generate_launch_description():
             'color_width': resolution_width,
             'enable_infra1': False,
             'enable_infra2': False,
-            'enable_depth': False,
-            'use_sim_time': True
+            'enable_depth': False
         }],
         remappings=[
             ('color/image_raw', 'image'),
@@ -48,8 +46,7 @@ def generate_launch_description():
         name='realsense_apriltag',
         namespace='',
         parameters=[{
-            'size': tag_size,
-            'use_sim_time': True
+            'size': tag_size
         }],
         remappings=[
             ('camera/image_rect', 'image_rect'),

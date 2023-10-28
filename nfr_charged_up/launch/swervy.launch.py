@@ -36,8 +36,7 @@ def generate_launch_description():
         executable='robot_state_publisher',
         name='robot_state_publisher',
         parameters=[{
-            'robot_description': robot_desc,
-            'use_sim_time': True
+            'robot_description': robot_desc
         }]
     )
     navigation_launch = IncludeLaunchDescription(
@@ -62,8 +61,7 @@ def generate_launch_description():
                 True, True, False, False, False, True,
                 False, False, False
             ],
-            'world_frame': 'odom',
-            'use_sim_time': True
+            'world_frame': 'odom'
         }],
         remappings=[
             ('set_pose', 'local_set_pose')
@@ -86,12 +84,16 @@ def generate_launch_description():
                 False, False, False, False, False, False,
                 False, False, False
             ],
-            'world_frame': 'map',
-            'use_sim_time': True
+            'world_frame': 'map'
         }],
         remappings=[
             ('set_pose', 'global_set_pose')
         ]
+    )
+    bridge_node = Node(
+        package='nfr_bridge',
+        executable='nfr_bridge_node',
+        name='nfr_bridge_node'
     )
     return LaunchDescription([
         robot_state_publisher,
@@ -99,5 +101,6 @@ def generate_launch_description():
         realsense_launch,
         navigation_launch,
         local_localization,
-        global_localization
+        global_localization,
+        bridge_node
     ])
