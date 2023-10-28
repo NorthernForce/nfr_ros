@@ -74,7 +74,7 @@ namespace nfr
             cmdVelTheta = cmdVelTable->GetDoubleTopic("theta").Publish();
             cmdVelSusbscription = create_subscription<geometry_msgs::msg::Twist>("cmd_vel", 10,
                 std::bind(&NFRBridgeNode::cmdVelCallback, this, std::placeholders::_1));
-            instance.SetServer("localhost", 5810);
+            instance.SetServerTeam(172);
             instance.StartClient4("xavier");
             RCLCPP_INFO(get_logger(), "Started NT client4 as 'xavier'");
         }
