@@ -72,6 +72,8 @@ namespace nfr
                     cameraToTagMessage.translation.z = detection.pose.pose.pose.position.z;
                     cameraToTagMessage.rotation = detection.pose.pose.pose.orientation;
                     tf2::fromMsg(cameraToTagMessage, cameraToTagTransform);
+                    RCLCPP_INFO(get_logger(), "Camera to tag: [%f, %f, %f]", cameraToTagTransform.getOrigin().getX(), cameraToTagTransform.getOrigin().getY(),
+                        cameraToTagTransform.getOrigin().getZ());
                     auto worldToTag = tagPoses[detection.id];
                     tf2::Transform worldToRobot = worldToTag * cameraToTagTransform.inverse() * baseToCameraTransform.inverse();
                     auto transform = tf2::toMsg(worldToRobot);
@@ -81,6 +83,8 @@ namespace nfr
                     pose.pose.pose.position.x = transform.translation.x;
                     pose.pose.pose.position.y = transform.translation.y;
                     pose.pose.pose.position.z = transform.translation.z;
+                    RCLCPP_INFO(get_logger(), "Pose estimated to be %f, %f, %f", transform.translation.x, transform.translation.y,
+                        worldToRobot.getRotation().getAngle());
                     pose.pose.pose.orientation = transform.rotation;
                     publisher->publish(pose);
                 }

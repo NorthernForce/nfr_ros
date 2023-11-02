@@ -82,9 +82,13 @@ namespace nfr
             buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             listener = std::make_shared<tf2_ros::TransformListener>(*buffer);
             timer = create_wall_timer(50ms, [&]() {
-                if (buffer->canTransform("base_link", "map", tf2::TimePointZero))
+                if (!instance.IsConnected())
                 {
-                    auto transform = buffer->lookupTransform("base_link", "map", tf2::TimePointZero);
+                    return;
+                }
+                if (buffer->canTransform("map", "base_link", tf2::TimePointZero))
+                {
+                    auto transform = buffer->lookupTransform("map", "base_link", tf2::TimePointZero);
                     poseX.Set(transform.transform.translation.x);
                     poseY.Set(transform.transform.translation.y);
                     tf2::Quaternion quaternion;
@@ -92,9 +96,11 @@ namespace nfr
                     double roll, pitch, yaw;
                     tf2::Matrix3x3(quaternion).getRPY(roll, pitch, yaw);
                     poseTheta.Set(yaw);
+                    RCLCPP_INFO(get_logger(), "map -> base_link: [%f, %f, %f]", transform.transform.translation.x,
+                        transform.transform.translation.y, yaw);
                     auto stamp = rclcpp::Time(transform.header.stamp);
                     std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
-                    poseStamp.Set(((std::chrono::nanoseconds)(stamp + offset)).count())
+                    poseStamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)stamp.nanoseconds() + offset)).count());
                 }
             });
             instance.SetServerTeam(172);
@@ -103,6 +109,10 @@ namespace nfr
         }
         void recieveOdometry(const nt::Event& event)
         {
+            if (!instance.IsConnected())
+            {
+                return;
+            }
             nav_msgs::msg::Odometry odometry;
             odometry.child_frame_id = "base_link";
             odometry.header.frame_id = "odom";
@@ -120,6 +130,10 @@ namespace nfr
         }
         void recieveGlobalSetPose(const nt::Event& event)
         {
+            if (!instance.IsConnected())
+            {
+                return;
+            }
             geometry_msgs::msg::PoseWithCovarianceStamped pose;
             std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)globalSetPoseStamp.Get();
             pose.header.stamp = rclcpp::Time((timestamp - (std::chrono::microseconds)instance.GetServerTimeOffset().value()).count());
@@ -133,6 +147,10 @@ namespace nfr
         }
         void recieveTargetPose(const nt::Event& event)
         {
+            if (!instance.IsConnected())
+            {
+                return;
+            }
             RCLCPP_INFO(get_logger(), "Setting target pose");
             nav2_msgs::action::NavigateToPose::Goal goal;
             goal.behavior_tree = "";
@@ -148,6 +166,10 @@ namespace nfr
         }
         void recieveCancel(const nt::Event& event)
         {
+            if (!instance.IsConnected())
+            {
+                return;
+            }
             if (targetPoseCancel.Get())
             {
                 RCLCPP_INFO(get_logger(), "Cancelling goal");
@@ -157,6 +179,10 @@ namespace nfr
         }
         void cmdVelCallback(const geometry_msgs::msg::Twist cmdVel)
         {
+            if (!instance.IsConnected())
+            {
+                return;
+            }
             cmdVelX.Set(cmdVel.linear.x);
             cmdVelY.Set(cmdVel.linear.y);
             cmdVelTheta.Set(cmdVel.angular.z);
