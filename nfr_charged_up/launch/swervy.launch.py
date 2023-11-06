@@ -9,15 +9,6 @@ import os
 def generate_launch_description():
     with open(os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'swervy.urdf')) as f:
         robot_desc = f.read()
-    rosbridge_launch = IncludeLaunchDescription(
-        AnyLaunchDescriptionSource(
-            [
-                os.path.join(get_package_share_directory('rosbridge_server'), 'launch'),
-                '/rosbridge_websocket_launch.xml'
-            ]
-        ),
-        launch_arguments=[('port', '5809')]
-    )
     realsense_launch = GroupAction(
         actions=[
             PushRosNamespace('realsense'),
@@ -97,7 +88,6 @@ def generate_launch_description():
     )
     return LaunchDescription([
         robot_state_publisher,
-        rosbridge_launch,
         realsense_launch,
         navigation_launch,
         local_localization,
