@@ -9,7 +9,7 @@ def generate_launch_description():
     resolution_width = LaunchConfiguration('resolution_width')
     resolution_height = LaunchConfiguration('resolution_height')
     field_path = LaunchConfiguration('field_path')
-    tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.18')
+    tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.24')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
     field_path_argument = DeclareLaunchArgument('field_path', default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'), 'config', 'field.json')))
