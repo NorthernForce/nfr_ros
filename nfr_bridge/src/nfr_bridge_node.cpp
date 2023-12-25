@@ -183,7 +183,7 @@ namespace nfr
             }
             buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             listener = std::make_shared<tf2_ros::TransformListener>(*buffer);
-            instance.SetServerTeam(172);
+            auto hosts = declare_parameter("hosts", std::vector<std::string>({"10.1.72.2:5810", "localhost:5810"}));
             instance.StartClient4("xavier");
             RCLCPP_INFO(get_logger(), "Started NT client4 as 'xavier'");
         }

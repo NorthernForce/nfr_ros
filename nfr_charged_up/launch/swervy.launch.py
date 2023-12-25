@@ -16,8 +16,7 @@ def generate_launch_description():
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
                         '/realsense_apriltag.launch.py'
                     ]
-                ),
-                launch_arguments=[('use_cuda', True)]
+                )
             )
         ]
     )

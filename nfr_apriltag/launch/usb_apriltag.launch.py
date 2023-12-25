@@ -12,18 +12,17 @@ def generate_launch_description():
     frame_id = LaunchConfiguration('frame_id')
     camera_info_url = LaunchConfiguration('camera_info_url')
     field_path = LaunchConfiguration('field_path')
-    use_cuda = LaunchConfiguration('use_cuda')
     tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.18')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
     camera_path_argument = DeclareLaunchArgument('camera_path', default_value='/dev/video0')
     frame_id_argument = DeclareLaunchArgument('frame_id', default_value='camera')
     camera_info_url_argument = DeclareLaunchArgument('camera_info_url', default_value='')
-    field_path_argument = DeclareLaunchArgument('field_path', default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'), 'config', 'field.json')))
-    use_cuda_argument = DeclareLaunchArgument('use_cuda', default_value='True')
+    field_path_argument = DeclareLaunchArgument('field_path', default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'),
+        'config', 'field.json')))
     rectify_node = ComposableNode(
-        package='isaac_ros_image_proc',
-        plugin='nvidia::isaac_ros::image_proc::RectifyNode',
+        package='image_proc',
+        plugin='image_proc::RectifyNode',
         name='usb_rectify',
         namespace='',
         parameters=[{
@@ -46,12 +45,13 @@ def generate_launch_description():
         }]
     )
     apriltag_node = ComposableNode(
-        package='isaac_ros_apriltag',
-        plugin='nvidia::isaac_ros::apriltag::AprilTagNode',
+        package='apriltag_ros',
+        plugin='AprilTagNode',
         name='usb_apriltag',
         namespace='',
         parameters=[{
-            'size': tag_size
+            'size': tag_size,
+            'family': '36h11'
         }],
         remappings=[
             ('camera/image_rect', 'image_rect'),
@@ -65,7 +65,6 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'field_path': field_path,
-            'use_cuda': use_cuda
         }]
     )
     usb_container = ComposableNodeContainer(
@@ -88,6 +87,5 @@ def generate_launch_description():
         frame_id_argument,
         camera_info_url_argument,
         field_path_argument,
-        use_cuda_argument,
         usb_container
     ])
