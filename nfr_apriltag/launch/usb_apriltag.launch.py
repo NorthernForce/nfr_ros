@@ -2,7 +2,7 @@ from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch import LaunchDescription
 def generate_launch_description():
     tag_size = LaunchConfiguration('tag_size')
@@ -31,14 +31,13 @@ def generate_launch_description():
         }]
     )
     usb_node = ComposableNode(
-        package='usb_cam',
-        plugin='usb_cam::USBCamNode',
+        package='v4l2_camera',
+        plugin='v4l2_camera::V4L2Camera',
         name='usb_camera',
         namespace='',
         parameters=[{
             'video_device': camera_path,
-            'image_width': resolution_width,
-            'iamge_height': resolution_height,
+            'image_size': PythonExpression(['[', resolution_width, ',', resolution_height, ']']),
             'camera_frame_id': frame_id,
             'camera_name': frame_id,
             'camera_info_url': camera_info_url

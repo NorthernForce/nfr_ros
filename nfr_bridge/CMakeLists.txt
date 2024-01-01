@@ -30,7 +30,7 @@ target_include_directories(nfr_bridge_node PUBLIC
 )
 target_compile_features(nfr_bridge_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++17
 ament_target_dependencies(nfr_bridge_node rclcpp rclcpp_action geometry_msgs tf2_geometry_msgs nav_msgs nav2_msgs sensor_msgs)
-target_link_libraries(nfr_bridge_node ntcore wpinet ntcore)
+target_link_libraries(nfr_bridge_node wpinet ntcore)
 install(TARGETS nfr_bridge_node
   DESTINATION lib/${PROJECT_NAME})
 

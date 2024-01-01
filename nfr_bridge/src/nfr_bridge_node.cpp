@@ -194,6 +194,7 @@ namespace nfr
         }
         void recieveOdometry(const nt::Event& event)
         {
+            (void)event;
             if (!instance.IsConnected())
             {
                 return;
@@ -209,6 +210,7 @@ namespace nfr
         }
         void receiveIMU(const nt::Event& event)
         {
+            (void)event;
             if (!instance.IsConnected())
             {
                 return;
@@ -224,6 +226,7 @@ namespace nfr
         }
         void recieveGlobalSetPose(const nt::Event& event)
         {
+            (void)event;
             if (!instance.IsConnected())
             {
                 return;
@@ -241,6 +244,7 @@ namespace nfr
         }
         void recieveTargetPose(const nt::Event& event)
         {
+            (void)event;
             if (!instance.IsConnected())
             {
                 return;
@@ -260,6 +264,7 @@ namespace nfr
         }
         void recieveCancel(const nt::Event& event)
         {
+            (void)event;
             if (!instance.IsConnected())
             {
                 return;

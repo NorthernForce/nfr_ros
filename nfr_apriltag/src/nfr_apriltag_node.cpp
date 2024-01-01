@@ -66,7 +66,7 @@ namespace nfr
                     if (!buffer->canTransform(detections.header.frame_id, detection.family + ":" + std::to_string(detection.id), tf2::TimePointZero))
                     {
                         RCLCPP_ERROR(get_logger(), "Could not transform %s to %s.", detections.header.frame_id.c_str(),
-                            detection.family + ":" + std::to_string(detection.id));
+                            (detection.family + ":" + std::to_string(detection.id)).c_str());
                         return;
                     }
                     auto baseToCamera = buffer->lookupTransform(baseFrame, detections.header.frame_id, tf2::TimePointZero);
