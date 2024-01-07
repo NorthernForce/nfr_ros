@@ -12,6 +12,8 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
+#include <networktables/NetworkTableInstance.h>
+#include <networktables/DoubleTopic.h>
 using AprilTagDetectionArray = apriltag_msgs::msg::AprilTagDetectionArray;
 using std::placeholders::_1;
 namespace nfr
@@ -25,6 +27,8 @@ namespace nfr
         std::shared_ptr<tf2_ros::TransformListener> listener;
         std::map<int, tf2::Transform> tagPoses;
         std::string baseFrame;
+        nt::NetworkTableInstance instance;
+        std::shared_ptr<nt::NetworkTable> table, apriltagTable;
     public:
         AprilTagLocalizationNode(const rclcpp::NodeOptions& options) : rclcpp::Node("nfr_apriltag_localization_node", options)
         {
@@ -46,6 +50,11 @@ namespace nfr
             }
             baseFrame = declare_parameter<std::string>("base_frame", "base_link");
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", get_parameter("field_path").as_string().c_str());
+            std::string tableName = declare_parameter("table_name", "xavier");
+            std::string cameraName = declare_parameter("camera_name", "default");
+            instance = nt::NetworkTableInstance::GetDefault();
+            table = instance.GetTable(tableName);
+            apriltagTable = table->GetSubTable("apriltags")->GetSubTable(cameraName);
         }
         void detectionCallback(const AprilTagDetectionArray& detections)
         {
@@ -86,6 +95,29 @@ namespace nfr
                     pose.pose.pose.position.y = worldToRobot.getOrigin().getY();
                     pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
                     publisher->publish(pose);
+                    std::stringstream tagNameStream;
+                    tagNameStream << "tag" << detection.id;
+                    auto table = apriltagTable->GetSubTable(tagNameStream.str());
+                    table->GetEntry("x").SetDouble(pose.pose.pose.position.x);
+                    table->GetEntry("y").SetDouble(pose.pose.pose.position.y);
+                    table->GetEntry("z").SetDouble(pose.pose.pose.position.z);
+                    table->GetEntry("qx").SetDouble(pose.pose.pose.orientation.x);
+                    table->GetEntry("qy").SetDouble(pose.pose.pose.orientation.y);
+                    table->GetEntry("qz").SetDouble(pose.pose.pose.orientation.z);
+                    table->GetEntry("qw").SetDouble(pose.pose.pose.orientation.w);
+                    table->GetEntry("cx").SetDouble(detection.centre.x);
+                    table->GetEntry("cy").SetDouble(detection.centre.y);
+                    table->GetEntry("c0x").SetDouble(detection.corners[0].x);
+                    table->GetEntry("c0y").SetDouble(detection.corners[0].y);
+                    table->GetEntry("c1x").SetDouble(detection.corners[1].x);
+                    table->GetEntry("c1y").SetDouble(detection.corners[1].y);
+                    table->GetEntry("c2x").SetDouble(detection.corners[2].x);
+                    table->GetEntry("c2y").SetDouble(detection.corners[2].y);
+                    table->GetEntry("c3x").SetDouble(detection.corners[3].x);
+                    table->GetEntry("c3y").SetDouble(detection.corners[3].y);
+                    std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
+                    table->GetEntry("stamp").SetInteger(((std::chrono::nanoseconds)((std::chrono::nanoseconds)((rclcpp::Time)detections.header.stamp)
+                        .nanoseconds() + offset)).count());
                 }
             }
         }
