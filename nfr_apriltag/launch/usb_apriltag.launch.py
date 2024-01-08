@@ -31,17 +31,21 @@ def generate_launch_description():
         }]
     )
     usb_node = ComposableNode(
-        package='v4l2_camera',
-        plugin='v4l2_camera::V4L2Camera',
+        package='usb_cam',
+        plugin='usb_cam::UsbCamNode',
         name='usb_camera',
         namespace='',
         parameters=[{
             'video_device': camera_path,
-            'image_size': PythonExpression(['[', resolution_width, ',', resolution_height, ']']),
+            'image_width': resolution_width,
+            'image_height': resolution_height,
             'camera_frame_id': frame_id,
             'camera_name': frame_id,
             'camera_info_url': camera_info_url
-        }]
+        }],
+        remappings=[
+            ('image_raw', 'image')
+        ]
     )
     apriltag_node = ComposableNode(
         package='apriltag_ros',
@@ -54,7 +58,8 @@ def generate_launch_description():
         }],
         remappings=[
             ('camera/image_rect', 'image_rect'),
-            ('camera/camera_info', 'camera_info')
+            ('camera/camera_info', 'camera_info'),
+            ('detections', 'tag_detections')
         ]
     )
     nfr_apriltag_node = ComposableNode(
