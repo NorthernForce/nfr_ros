@@ -25,7 +25,7 @@ target_include_directories(nfr_apriltag_node PUBLIC
   $<INSTALL_INTERFACE:include>
   "/usr/local/include/ntcore"
   "/usr/local/include/wpiutil")
-target_compile_features(nfr_apriltag_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++20
+target_compile_features(nfr_apriltag_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++20
 ament_target_dependencies(nfr_apriltag_node tf2 tf2_ros geometry_msgs tf2_geometry_msgs ament_index_cpp rclcpp rclcpp_components apriltag_msgs)
 target_link_libraries(nfr_apriltag_node ntcore wpinet ntcore)
 rclcpp_components_register_nodes(nfr_apriltag_node "nfr::AprilTagLocalizationNode")
