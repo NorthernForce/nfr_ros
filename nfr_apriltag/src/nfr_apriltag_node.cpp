@@ -13,7 +13,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
 #include <networktables/NetworkTableInstance.h>
-#include <networktables/DoubleTopic.h>
+#include <networktables/DoubleArrayTopic.h>
 using AprilTagDetectionArray = apriltag_msgs::msg::AprilTagDetectionArray;
 using std::placeholders::_1;
 namespace nfr
@@ -54,10 +54,13 @@ namespace nfr
             std::string cameraName = declare_parameter("camera_name", "default");
             instance = nt::NetworkTableInstance::GetDefault();
             table = instance.GetTable(tableName);
+            instance.SetServerTeam(declare_parameter("team_number", 172));
             apriltagTable = table->GetSubTable("apriltags")->GetSubTable(cameraName);
+            instance.StartClient4("xavier-apriltag-" + cameraName);
         }
         void detectionCallback(const AprilTagDetectionArray& detections)
         {
+            std::vector<std::string> foundTags;
             for (auto detection : detections.detections)
             {
                 RCLCPP_INFO(get_logger(), "Detected apriltag #%d.", detection.id);
@@ -96,28 +99,34 @@ namespace nfr
                     pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
                     publisher->publish(pose);
                     std::stringstream tagNameStream;
-                    tagNameStream << "tag" << detection.id;
-                    auto table = apriltagTable->GetSubTable(tagNameStream.str());
-                    table->GetEntry("x").SetDouble(pose.pose.pose.position.x);
-                    table->GetEntry("y").SetDouble(pose.pose.pose.position.y);
-                    table->GetEntry("z").SetDouble(pose.pose.pose.position.z);
-                    table->GetEntry("qx").SetDouble(pose.pose.pose.orientation.x);
-                    table->GetEntry("qy").SetDouble(pose.pose.pose.orientation.y);
-                    table->GetEntry("qz").SetDouble(pose.pose.pose.orientation.z);
-                    table->GetEntry("qw").SetDouble(pose.pose.pose.orientation.w);
-                    table->GetEntry("cx").SetDouble(detection.centre.x);
-                    table->GetEntry("cy").SetDouble(detection.centre.y);
-                    table->GetEntry("c0x").SetDouble(detection.corners[0].x);
-                    table->GetEntry("c0y").SetDouble(detection.corners[0].y);
-                    table->GetEntry("c1x").SetDouble(detection.corners[1].x);
-                    table->GetEntry("c1y").SetDouble(detection.corners[1].y);
-                    table->GetEntry("c2x").SetDouble(detection.corners[2].x);
-                    table->GetEntry("c2y").SetDouble(detection.corners[2].y);
-                    table->GetEntry("c3x").SetDouble(detection.corners[3].x);
-                    table->GetEntry("c3y").SetDouble(detection.corners[3].y);
-                    std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
-                    table->GetEntry("stamp").SetInteger(((std::chrono::nanoseconds)((std::chrono::nanoseconds)((rclcpp::Time)detections.header.stamp)
-                        .nanoseconds() + offset)).count());
+                    tagNameStream << detection.family << "_" << detection.id;
+                    if (instance.IsConnected())
+                    {
+                        foundTags.push_back(tagNameStream.str());
+                        auto table = apriltagTable->GetSubTable(tagNameStream.str());
+                        table->GetEntry("hamming").SetInteger(detection.hamming);
+                        table->GetEntry("decisionMargin").SetDouble(detection.decision_margin);
+                        table->GetEntry("homography").SetDoubleArray(detection.homography);
+                        table->GetEntry("centerY").SetDouble(detection.centre.x);
+                        table->GetEntry("centerX").SetDouble(detection.centre.y);
+                        table->GetEntry("corners").SetDoubleArray(std::span<const double, 8>({detection.corners[0].x, detection.corners[0].y,
+                            detection.corners[1].x, detection.corners[1].y, detection.corners[2].x, detection.corners[2].y,
+                            detection.corners[3].x, detection.corners[3].y}));
+                        table->GetEntry("present").SetBoolean(true);
+                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
+                        table->GetEntry("stamp").SetInteger(((std::chrono::nanoseconds)((std::chrono::nanoseconds)((rclcpp::Time)detections.header.stamp)
+                            .nanoseconds() + offset)).count());
+                    }
+                }
+            }
+            if (instance.IsConnected())
+            {
+                for (auto table : apriltagTable->GetSubTables())
+                {
+                    if (std::find(foundTags.begin(), foundTags.end(), table) == foundTags.end())
+                    {
+                        apriltagTable->GetSubTable(table)->GetEntry("present").SetBoolean(false);
+                    }
                 }
             }
         }

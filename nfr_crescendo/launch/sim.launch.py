@@ -113,6 +113,16 @@ def generate_launch_description():
             'camera_name': 'USBCam'
         }]
     )
+    note_detection_node = Node(
+        package='nfr_note_detector',
+        executable='nfr_note_detector_node',
+        name='nfr_note_detector_node',
+        namespace='usb_cam',
+        parameters=[{
+            'camera_path': 'image',
+            'camera_name': 'USBCam'
+        }]
+    )
     return LaunchDescription([
         robot_state_publisher,
         usb_cam_launch,
@@ -120,5 +130,6 @@ def generate_launch_description():
         local_localization,
         global_localization,
         bridge_node,
-        camera_node
+        camera_node,
+        note_detection_node
     ])

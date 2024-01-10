@@ -28,12 +28,10 @@ namespace nfr
             RCLCPP_INFO(get_logger(), "Opened");
             server.SetSource(outputStream);
             imageSubscriber = create_subscription<sensor_msgs::msg::Image>(cameraPath, 10, [&](sensor_msgs::msg::Image msg) {
-                cv::Mat mat = cv_bridge::toCvCopy(msg)->image;
+                cv::Mat mat = cv_bridge::toCvCopy(msg, "rgb8")->image;
                 cv::Mat newMat;
                 cv::resize(mat, newMat, {resolutionWidth, resolutionHeight});
-                cv::Mat mats[2];
-                cv::split(newMat, mats);
-                outputStream.PutFrame(mats[0]);
+                outputStream.PutFrame(newMat);
             });
         }
     };

@@ -81,6 +81,7 @@ namespace nfr
             std::string tableName = declare_parameter("table_name", "xavier");
             instance = nt::NetworkTableInstance::GetDefault();
             table = instance.GetTable(tableName);
+            instance.SetServerTeam(declare_parameter("team_number", 172));
             {
                 odometry.table = table->GetSubTable("odometry");
                 odometry.deltaX = odometry.table->GetDoubleTopic("vx").Subscribe(0.0);
