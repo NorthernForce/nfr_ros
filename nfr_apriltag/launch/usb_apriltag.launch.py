@@ -15,6 +15,7 @@ def generate_launch_description():
     camera_name = LaunchConfiguration('camera_name')
     camera_port = LaunchConfiguration('camera_port')
     fps = LaunchConfiguration('fps')
+    pixel_format = LaunchConfiguration('pixel_format')
     tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.18')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
@@ -26,6 +27,7 @@ def generate_launch_description():
     camera_name_argument = DeclareLaunchArgument('camera_name', default_value='default')
     camera_port_argument = DeclareLaunchArgument('camera_port', default_value='1181')
     fps_argument = DeclareLaunchArgument('fps', default_value='30')
+    pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='yuyv')
     rectify_node = ComposableNode(
         package='image_proc',
         plugin='image_proc::RectifyNode',
@@ -47,7 +49,8 @@ def generate_launch_description():
             'image_height': resolution_height,
             'camera_frame_id': frame_id,
             'camera_name': frame_id,
-            'camera_info_url': camera_info_url
+            'camera_info_url': camera_info_url,
+            'pixel_format': pixel_format
         }],
         remappings=[
             ('image_raw', 'image')
@@ -87,7 +90,8 @@ def generate_launch_description():
             rectify_node,
             apriltag_node,
             usb_node
-        ]
+        ],
+        respawn=True
     )
     camera_node = Node(
         package='nfr_camera',
@@ -112,6 +116,7 @@ def generate_launch_description():
         field_path_argument,
         camera_name_argument,
         camera_port_argument,
+        pixel_format_argument,
         fps_argument,
         usb_container,
         camera_node

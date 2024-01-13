@@ -17,7 +17,13 @@ def generate_launch_description():
                         '/usb_apriltag.launch.py'
                     ]
                 ),
-                launch_arguments=[('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json'))]
+                launch_arguments=[
+                    ('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json')),
+                    ('camera_info_url', 'package://nfr_crescendo/config/usb1.yaml'),
+                    ('pixel_format', 'yuyv'),
+                    ('resolution_width', '640'),
+                    ('resolution_width', '480')
+                ]
             )
         ]
     )
@@ -104,20 +110,24 @@ def generate_launch_description():
         }]
     )
     camera_node = GroupAction(
-        PushRosNamespace('usb_cam2'),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                '/usb_apriltag.launch.py'
-            ]),
-            launch_arguments=[
-                ('camera_path', '/dev/video1'),
-                ('camera_name', 'usb_cam2')
-                ('camera_port', '1182'),
-                ('resolution_width', '640'),
-                ('resolution_height', '480')
-            ]
-        )
+        actions = [
+            PushRosNamespace('usb_cam2'),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    os.path.join(get_package_share_directory('nfr_camera'), 'launch'),
+                    '/usb_cam.launch.py'
+                ]),
+                launch_arguments=[
+                    ('camera_path', '/dev/video1'),
+                    ('camera_name', 'usb_cam2'),
+                    ('camera_port', '1182'),
+                    ('resolution_width', '640'),
+                    ('resolution_height', '480'),
+                    ('camera_info_url', 'package://nfr_crescendo/config/usb2.yaml'),
+                    ('pixel_format', 'yuyv')
+                ]
+            )
+        ]
     )
     note_detection_node = Node(
         package='nfr_note_detector',

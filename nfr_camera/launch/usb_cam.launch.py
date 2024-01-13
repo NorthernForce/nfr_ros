@@ -12,6 +12,7 @@ def generate_launch_description():
     camera_name = LaunchConfiguration('camera_name')
     camera_port = LaunchConfiguration('camera_port')
     fps = LaunchConfiguration('fps')
+    pixel_format = LaunchConfiguration('pixel_format')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
     camera_path_argument = DeclareLaunchArgument('camera_path', default_value='/dev/video0')
@@ -20,6 +21,7 @@ def generate_launch_description():
     camera_name_argument = DeclareLaunchArgument('camera_name', default_value='default')
     camera_port_argument = DeclareLaunchArgument('camera_port', default_value='1181')
     fps_argument = DeclareLaunchArgument('fps', default_value='30')
+    pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='rgb24')
     usb_node = ComposableNode(
         package='usb_cam',
         plugin='usb_cam::UsbCamNode',
@@ -31,7 +33,8 @@ def generate_launch_description():
             'image_height': resolution_height,
             'camera_frame_id': frame_id,
             'camera_name': frame_id,
-            'camera_info_url': camera_info_url
+            'camera_info_url': camera_info_url,
+            'pixel_format': pixel_format
         }],
         remappings=[
             ('image_raw', 'image')
@@ -68,6 +71,7 @@ def generate_launch_description():
         camera_name_argument,
         camera_port_argument,
         fps_argument,
+        pixel_format_argument,
         usb_container,
         camera_node
     ])
