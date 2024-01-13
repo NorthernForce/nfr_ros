@@ -14,7 +14,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     [
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                        '/realsense_apriltag.launch.py'
+                        '/usb_apriltag.launch.py'
                     ]
                 ),
                 launch_arguments=[('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json'))]
@@ -103,11 +103,21 @@ def generate_launch_description():
             'cameras': ['realsense']
         }]
     )
+    camera_node = Node(
+        package='nfr_camera',
+        executable='nfr_camera_node',
+        name='nfr_camera_node',
+        parameters=[{
+            'camera_path': 'image',
+            'camera_name': 'USBCam'
+        }]
+    )
     return LaunchDescription([
         robot_state_publisher,
         realsense_launch,
         navigation_launch,
         local_localization,
         global_localization,
-        bridge_node
+        bridge_node,
+        camera_node
     ])
