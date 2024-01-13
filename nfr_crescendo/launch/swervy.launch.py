@@ -7,14 +7,14 @@ import os
 def generate_launch_description():
     with open(os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'swervy.urdf')) as f:
         robot_desc = f.read()
-    realsense_launch = GroupAction(
+    apriltag_launch = GroupAction(
         actions=[
-            PushRosNamespace('realsense'),
+            PushRosNamespace('usb_cam1'),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                        '/realsense_apriltag.launch.py'
+                        '/usb_apriltag.launch.py'
                     ]
                 ),
                 launch_arguments=[('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json'))]
@@ -83,7 +83,7 @@ def generate_launch_description():
                 False, False, False, False, False, False,
                 False, False, False
             ],
-            'pose0': '/realsense/pose_estimations',
+            'pose0': '/usb_cam1/pose_estimations',
             'pose0_config': [
                 True, True, False, False, False, False,
                 False, False, False, False, False, False,
@@ -100,14 +100,42 @@ def generate_launch_description():
         executable='nfr_bridge_node',
         name='nfr_bridge_node',
         parameters=[{
-            'cameras': ['realsense']
+            'target_cameras': ['usb_cam1', 'usb_cam2']
+        }]
+    )
+    camera_node = GroupAction(
+        PushRosNamespace('usb_cam2'),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
+                '/usb_apriltag.launch.py'
+            ]),
+            launch_arguments=[
+                ('camera_path', '/dev/video1'),
+                ('camera_name', 'usb_cam2')
+                ('camera_port', '1182'),
+                ('resolution_width', '640'),
+                ('resolution_height', '480')
+            ]
+        )
+    )
+    note_detection_node = Node(
+        package='nfr_note_detector',
+        executable='nfr_note_detector_node',
+        name='nfr_note_detector_node',
+        namespace='usb_cam2',
+        parameters=[{
+            'camera_path': 'image',
+            'camera_name': 'USBCam'
         }]
     )
     return LaunchDescription([
         robot_state_publisher,
-        realsense_launch,
+        apriltag_launch,
         navigation_launch,
         local_localization,
         global_localization,
-        bridge_node
+        bridge_node,
+        camera_node,
+        note_detection_node
     ])

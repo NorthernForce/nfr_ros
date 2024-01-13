@@ -17,6 +17,7 @@ find_package(wpiutil REQUIRED)
 find_package(wpinet REQUIRED)
 find_package(ntcore REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nfr_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -29,8 +30,8 @@ target_include_directories(nfr_bridge_node PUBLIC
   "/usr/local/include/wpiutil"
 )
 target_compile_features(nfr_bridge_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++17
-ament_target_dependencies(nfr_bridge_node rclcpp rclcpp_action geometry_msgs tf2_geometry_msgs nav_msgs nav2_msgs sensor_msgs)
-target_link_libraries(nfr_bridge_node wpinet ntcore)
+ament_target_dependencies(nfr_bridge_node rclcpp rclcpp_action geometry_msgs tf2_geometry_msgs nav_msgs nav2_msgs sensor_msgs nfr_msgs)
+target_link_libraries(nfr_bridge_node wpinet ntcore wpiutil)
 install(TARGETS nfr_bridge_node
   DESTINATION lib/${PROJECT_NAME})
 

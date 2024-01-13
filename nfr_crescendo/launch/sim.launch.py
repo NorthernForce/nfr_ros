@@ -9,7 +9,7 @@ def generate_launch_description():
         robot_desc = f.read()
     usb_cam_launch = GroupAction(
         actions=[
-            PushRosNamespace('usb_cam'),
+            PushRosNamespace('usb_cam1'),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [
@@ -83,7 +83,7 @@ def generate_launch_description():
                 False, False, False, False, False, False,
                 False, False, False
             ],
-            'pose0': '/usb_cam/pose_estimations',
+            'pose0': '/usb_cam1/pose_estimations',
             'pose0_config': [
                 True, True, False, False, False, False,
                 False, False, False, False, False, False,
@@ -100,7 +100,7 @@ def generate_launch_description():
         executable='nfr_bridge_node',
         name='nfr_bridge_node',
         parameters=[{
-            'cameras': ['usb_cam']
+            'target_cameras': ['usb_cam1', 'usb_cam2']
         }]
     )
     camera_node = Node(

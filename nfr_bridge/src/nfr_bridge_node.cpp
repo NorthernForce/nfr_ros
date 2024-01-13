@@ -14,6 +14,9 @@
 #include <networktables/DoubleTopic.h>
 #include <networktables/IntegerTopic.h>
 #include <networktables/BooleanTopic.h>
+#include <networktables/DoubleArrayTopic.h>
+#include <networktables/IntegerArrayTopic.h>
+#include <nfr_msgs/msg/target_list.hpp>
 using namespace std::chrono_literals;
 namespace nfr
 {
@@ -58,14 +61,14 @@ namespace nfr
             nt::IntegerPublisher stamp;
             rclcpp::TimerBase::SharedPtr timer;
         } pose;
-        struct Camera
+        struct TargetCamera
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoublePublisher x, y, z, qx, qy, qz, qw;
-            nt::IntegerPublisher stamp;
-            rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr subscription;
+            nt::DoubleArrayPublisher area, pitch, yaw, tx, ty;
+            nt::IntegerArrayPublisher fiducialID, stamp;
+            rclcpp::Subscription<nfr_msgs::msg::TargetList>::SharedPtr subscription;
         };
-        std::vector<Camera> cameras;
+        std::vector<TargetCamera> cameras;
         struct
         {
             std::shared_ptr<nt::NetworkTable> table;
@@ -154,39 +157,50 @@ namespace nfr
                     }
                 });
             }
-            auto cameraNames = declare_parameter("camera_names", std::vector<std::string>());
+            auto cameraNames = declare_parameter("target_cameras", std::vector<std::string>());
             for (size_t i = 0; i < cameraNames.size(); i++)
             {
-                cameras.push_back(Camera());
-                Camera& camera = cameras[i];
+                cameras.push_back(TargetCamera());
+                TargetCamera& camera = cameras[i];
                 camera.table = table->GetSubTable(cameraNames[i]);
-                camera.x = camera.table->GetDoubleTopic("x").Publish();
-                camera.y = camera.table->GetDoubleTopic("y").Publish();
-                camera.z = camera.table->GetDoubleTopic("z").Publish();
-                camera.qx = camera.table->GetDoubleTopic("qx").Publish();
-                camera.qy = camera.table->GetDoubleTopic("qy").Publish();
-                camera.qz = camera.table->GetDoubleTopic("qz").Publish();
-                camera.qw = camera.table->GetDoubleTopic("qw").Publish();
-                camera.stamp = camera.table->GetIntegerTopic("stamp").Publish();
-                camera.subscription = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(cameraNames[i] + "/pose_estimations",
-                    10, [&](const geometry_msgs::msg::PoseWithCovarianceStamped& msg) {
-                    camera.x.Set(msg.pose.pose.position.x);
-                    camera.y.Set(msg.pose.pose.position.y);
-                    camera.z.Set(msg.pose.pose.position.z);
-                    camera.qx.Set(msg.pose.pose.orientation.x);
-                    camera.qy.Set(msg.pose.pose.orientation.y);
-                    camera.qz.Set(msg.pose.pose.orientation.z);
-                    camera.qw.Set(msg.pose.pose.orientation.w);
-                    auto stamp = rclcpp::Time(msg.header.stamp);
-                    std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
-                    camera.stamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)stamp.nanoseconds() + offset)).count());
+                camera.area = camera.table->GetDoubleArrayTopic("area").Publish();
+                camera.pitch = camera.table->GetDoubleArrayTopic("pitch").Publish();
+                camera.yaw = camera.table->GetDoubleArrayTopic("yaw").Publish();
+                camera.tx = camera.table->GetDoubleArrayTopic("tx").Publish();
+                camera.ty = camera.table->GetDoubleArrayTopic("ty").Publish();
+                camera.fiducialID = camera.table->GetIntegerArrayTopic("fiducial_id").Publish();
+                camera.stamp = camera.table->GetIntegerArrayTopic("stamp").Publish();
+                camera.subscription = create_subscription<nfr_msgs::msg::TargetList>(cameraNames[i] + "/targets", 10,
+                    [&](const nfr_msgs::msg::TargetList& msg) {
+                    std::vector<double> area, pitch, yaw, tx, ty;
+                    std::vector<long> fiducialID, stamp;
+                    for (size_t i = 0; i < msg.targets.size(); i++)
+                    {
+                        area.push_back(msg.targets[i].area);
+                        pitch.push_back(msg.targets[i].pitch);
+                        yaw.push_back(msg.targets[i].yaw);
+                        tx.push_back(msg.targets[i].center.x);
+                        ty.push_back(msg.targets[i].center.y);
+                        fiducialID.push_back(msg.targets[i].fiducial_id);
+                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
+                        stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
+                            ((rclcpp::Time)msg.targets[i].header.stamp).nanoseconds() + offset)).count());
+                    }
+                    camera.area.Set(area);
+                    camera.pitch.Set(pitch);
+                    camera.yaw.Set(yaw);
+                    camera.tx.Set(tx);
+                    camera.ty.Set(ty);
+                    camera.fiducialID.Set(fiducialID);
+                    camera.stamp.Set(stamp);
                 });
             }
             buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             listener = std::make_shared<tf2_ros::TransformListener>(*buffer);
             auto hosts = declare_parameter("hosts", std::vector<std::string>({"10.1.72.2:5810", "localhost:5810"}));
-            instance.StartClient4("xavier");
-            RCLCPP_INFO(get_logger(), "Started NT client4 as 'xavier'");
+            std::string clientName = declare_parameter("client_name", "xavier");
+            instance.StartClient4(clientName);
+            RCLCPP_INFO(get_logger(), "Started NT client4 as '%s'", clientName.c_str());
         }
         inline rclcpp::Time toHostTime(std::chrono::nanoseconds timestamp)
         {

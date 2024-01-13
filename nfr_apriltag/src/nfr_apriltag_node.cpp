@@ -12,8 +12,8 @@
 #include <tf2/LinearMath/Transform.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <apriltag_msgs/msg/april_tag_detection_array.hpp>
-#include <networktables/NetworkTableInstance.h>
-#include <networktables/DoubleArrayTopic.h>
+#include <nfr_msgs/msg/target_list.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
 using AprilTagDetectionArray = apriltag_msgs::msg::AprilTagDetectionArray;
 using std::placeholders::_1;
 namespace nfr
@@ -23,18 +23,25 @@ namespace nfr
     private:
         rclcpp::Subscription<AprilTagDetectionArray>::SharedPtr subscription;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr publisher;
+        rclcpp::Publisher<nfr_msgs::msg::TargetList>::SharedPtr targetPublisher;
+        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr infoSubscription;
+        sensor_msgs::msg::CameraInfo info;
         std::unique_ptr<tf2_ros::Buffer> buffer;
         std::shared_ptr<tf2_ros::TransformListener> listener;
         std::map<int, tf2::Transform> tagPoses;
         std::string baseFrame;
-        nt::NetworkTableInstance instance;
-        std::shared_ptr<nt::NetworkTable> table, apriltagTable;
     public:
         AprilTagLocalizationNode(const rclcpp::NodeOptions& options) : rclcpp::Node("nfr_apriltag_localization_node", options)
         {
             subscription = create_subscription<AprilTagDetectionArray>("tag_detections", rclcpp::SensorDataQoS(),
                 std::bind(&AprilTagLocalizationNode::detectionCallback, this, _1));
             publisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_estimations", rclcpp::SensorDataQoS());
+            targetPublisher = create_publisher<nfr_msgs::msg::TargetList>("targets", 10);
+            infoSubscription = create_subscription<sensor_msgs::msg::CameraInfo>("camera_info", 10, [&](const sensor_msgs::msg::CameraInfo& msg)
+            {
+                info = msg;
+                infoSubscription.reset();
+            });
             buffer = std::make_unique<tf2_ros::Buffer>(get_clock());
             listener = std::make_shared<tf2_ros::TransformListener>(*buffer);
             std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
@@ -50,17 +57,10 @@ namespace nfr
             }
             baseFrame = declare_parameter<std::string>("base_frame", "base_link");
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", get_parameter("field_path").as_string().c_str());
-            std::string tableName = declare_parameter("table_name", "xavier");
-            std::string cameraName = declare_parameter("camera_name", "default");
-            instance = nt::NetworkTableInstance::GetDefault();
-            table = instance.GetTable(tableName);
-            instance.SetServerTeam(declare_parameter("team_number", 172));
-            apriltagTable = table->GetSubTable("apriltags")->GetSubTable(cameraName);
-            instance.StartClient4("xavier-apriltag-" + cameraName);
         }
         void detectionCallback(const AprilTagDetectionArray& detections)
         {
-            std::vector<std::string> foundTags;
+            nfr_msgs::msg::TargetList targets;
             for (auto detection : detections.detections)
             {
                 RCLCPP_INFO(get_logger(), "Detected apriltag #%d.", detection.id);
@@ -98,35 +98,15 @@ namespace nfr
                     pose.pose.pose.position.y = worldToRobot.getOrigin().getY();
                     pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
                     publisher->publish(pose);
-                    std::stringstream tagNameStream;
-                    tagNameStream << detection.family << "_" << detection.id;
-                    if (instance.IsConnected())
-                    {
-                        foundTags.push_back(tagNameStream.str());
-                        auto table = apriltagTable->GetSubTable(tagNameStream.str());
-                        table->GetEntry("hamming").SetInteger(detection.hamming);
-                        table->GetEntry("decisionMargin").SetDouble(detection.decision_margin);
-                        table->GetEntry("homography").SetDoubleArray(detection.homography);
-                        table->GetEntry("centerY").SetDouble(detection.centre.x);
-                        table->GetEntry("centerX").SetDouble(detection.centre.y);
-                        table->GetEntry("corners").SetDoubleArray(std::span<const double, 8>({detection.corners[0].x, detection.corners[0].y,
-                            detection.corners[1].x, detection.corners[1].y, detection.corners[2].x, detection.corners[2].y,
-                            detection.corners[3].x, detection.corners[3].y}));
-                        table->GetEntry("present").SetBoolean(true);
-                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
-                        table->GetEntry("stamp").SetInteger(((std::chrono::nanoseconds)((std::chrono::nanoseconds)((rclcpp::Time)detections.header.stamp)
-                            .nanoseconds() + offset)).count());
-                    }
-                }
-            }
-            if (instance.IsConnected())
-            {
-                for (auto table : apriltagTable->GetSubTables())
-                {
-                    if (std::find(foundTags.begin(), foundTags.end(), table) == foundTags.end())
-                    {
-                        apriltagTable->GetSubTable(table)->GetEntry("present").SetBoolean(false);
-                    }
+                    nfr_msgs::msg::Target target;
+                    target.header = detections.header;
+                    target.area = 0;
+                    target.center.x = detection.centre.x;
+                    target.center.x = detection.centre.y;
+                    target.fiducial_id = detection.id;
+                    target.yaw = atan((target.center.x - info.k[2]) / info.k[0]);
+                    target.pitch = atan((target.center.y - info.k[4]) / (target.center.y / info.k[5]));
+                    targets.targets.push_back(target);
                 }
             }
         }

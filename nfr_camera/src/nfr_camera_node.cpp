@@ -17,17 +17,16 @@ namespace nfr
     public:
         NFRCameraNode() : rclcpp::Node("nfr_camera_node")
         {
-            std::string cameraPath = declare_parameter("camera_path", "/realsense/image_raw");
-            std::string cameraName = declare_parameter("camera_name", "realsense");
+            std::string cameraName = declare_parameter("camera_name", "default camera");
             server = cs::MjpegServer(cameraName, declare_parameter("camera_port", 1181));
             resolutionWidth = declare_parameter("resolution_width", 640);
             resolutionHeight = declare_parameter("resolution_height", 480);
             int fps = declare_parameter("fps", 30);
             RCLCPP_INFO(get_logger(), "Opening outputStream for %d, %d, %d", resolutionWidth, resolutionHeight, fps);
             outputStream = cs::CvSource(cameraName, cs::VideoMode::kMJPEG, resolutionWidth, resolutionHeight, fps);
-            RCLCPP_INFO(get_logger(), "Opened");
+            RCLCPP_INFO(get_logger(), "Opened outputStream");
             server.SetSource(outputStream);
-            imageSubscriber = create_subscription<sensor_msgs::msg::Image>(cameraPath, 10, [&](sensor_msgs::msg::Image msg) {
+            imageSubscriber = create_subscription<sensor_msgs::msg::Image>("image", 10, [&](sensor_msgs::msg::Image msg) {
                 cv::Mat mat = cv_bridge::toCvCopy(msg, "rgb8")->image;
                 cv::Mat newMat;
                 cv::resize(mat, newMat, {resolutionWidth, resolutionHeight});

@@ -27,6 +27,7 @@ target_link_libraries(nfr_camera_node cscore wpinet wpiutil)
 target_compile_features(nfr_camera_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++17
 ament_target_dependencies(nfr_camera_node rclcpp sensor_msgs cv_bridge)
 
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
 install(TARGETS nfr_camera_node
   DESTINATION lib/${PROJECT_NAME})
 

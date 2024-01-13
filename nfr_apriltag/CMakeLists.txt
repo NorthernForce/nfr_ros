@@ -16,18 +16,15 @@ find_package(ament_index_cpp REQUIRED)
 find_package(apriltag_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(wpiutil REQUIRED)
-find_package(wpinet REQUIRED)
-find_package(ntcore REQUIRED)
+find_package(nfr_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 add_library(nfr_apriltag_node SHARED src/nfr_apriltag_node.cpp)
 target_include_directories(nfr_apriltag_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  "/usr/local/include/ntcore"
-  "/usr/local/include/wpiutil")
+  $<INSTALL_INTERFACE:include>)
 target_compile_features(nfr_apriltag_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++20
-ament_target_dependencies(nfr_apriltag_node tf2 tf2_ros geometry_msgs tf2_geometry_msgs ament_index_cpp rclcpp rclcpp_components apriltag_msgs)
-target_link_libraries(nfr_apriltag_node ntcore wpinet ntcore)
+ament_target_dependencies(nfr_apriltag_node tf2 tf2_ros geometry_msgs tf2_geometry_msgs ament_index_cpp rclcpp rclcpp_components apriltag_msgs
+  nfr_msgs sensor_msgs)
 rclcpp_components_register_nodes(nfr_apriltag_node "nfr::AprilTagLocalizationNode")
 set(node_plugins "${node_plugins}nfr::AprilTagLocalizationNode;$<TARGET_FILE:nfr_apriltag_node>\n")
 install(TARGETS nfr_apriltag_node DESTINATION lib)
