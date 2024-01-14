@@ -22,7 +22,7 @@ def generate_launch_description():
                     ('camera_info_url', 'package://nfr_crescendo/config/usb1.yaml'),
                     ('pixel_format', 'yuyv'),
                     ('resolution_width', '640'),
-                    ('resolution_width', '480')
+                    ('resolution_height', '480')
                 ]
             )
         ]
@@ -136,7 +136,8 @@ def generate_launch_description():
         namespace='usb_cam2',
         parameters=[{
             'camera_path': 'image',
-            'camera_name': 'USBCam'
+            'camera_name': 'USBCam',
+            'camera_port': 1183
         }]
     )
     return LaunchDescription([

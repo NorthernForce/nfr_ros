@@ -2,7 +2,8 @@ from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.conditions import IfCondition
 from launch import LaunchDescription
 def generate_launch_description():
     tag_size = LaunchConfiguration('tag_size')
@@ -16,6 +17,7 @@ def generate_launch_description():
     camera_port = LaunchConfiguration('camera_port')
     fps = LaunchConfiguration('fps')
     pixel_format = LaunchConfiguration('pixel_format')
+    launch_camera_server = LaunchConfiguration('launch_camera_server')
     tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.18')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
@@ -28,6 +30,7 @@ def generate_launch_description():
     camera_port_argument = DeclareLaunchArgument('camera_port', default_value='1181')
     fps_argument = DeclareLaunchArgument('fps', default_value='30')
     pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='yuyv')
+    launch_camera_server_argument = DeclareLaunchArgument('launch_camera_server', default_value='True')
     rectify_node = ComposableNode(
         package='image_proc',
         plugin='image_proc::RectifyNode',
@@ -104,7 +107,8 @@ def generate_launch_description():
             'resolution_height': resolution_height,
             'camera_port': camera_port,
             'fps': fps
-        }]
+        }],
+        condition=IfCondition(launch_camera_server)
     )
     return LaunchDescription([
         tag_size_argument,
@@ -117,6 +121,7 @@ def generate_launch_description():
         camera_name_argument,
         camera_port_argument,
         pixel_format_argument,
+        launch_camera_server_argument,
         fps_argument,
         usb_container,
         camera_node
