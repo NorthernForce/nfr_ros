@@ -22,7 +22,8 @@ def generate_launch_description():
                     ('camera_info_url', 'package://nfr_crescendo/config/usb1.yaml'),
                     ('pixel_format', 'yuyv'),
                     ('resolution_width', '640'),
-                    ('resolution_height', '480')
+                    ('resolution_height', '480'),
+                    ('camera_path', '/dev/video0')
                 ]
             )
         ]
@@ -118,7 +119,7 @@ def generate_launch_description():
                     '/usb_cam.launch.py'
                 ]),
                 launch_arguments=[
-                    ('camera_path', '/dev/video1'),
+                    ('camera_path', '/dev/video2'),
                     ('camera_name', 'usb_cam2'),
                     ('camera_port', '1182'),
                     ('resolution_width', '640'),

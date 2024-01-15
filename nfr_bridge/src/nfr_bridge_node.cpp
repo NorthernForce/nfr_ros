@@ -221,6 +221,7 @@ namespace nfr
             msg.header.stamp = toHostTime(timestamp);
             msg.twist.twist.linear.x = odometry.deltaX.Get();
             msg.twist.twist.linear.y = odometry.deltaY.Get();
+            RCLCPP_INFO(get_logger(), "Recieved odometry");
             odometry.publisher->publish(msg);
         }
         void receiveIMU(const nt::Event& event)

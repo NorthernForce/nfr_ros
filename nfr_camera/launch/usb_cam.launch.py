@@ -24,7 +24,7 @@ def generate_launch_description():
     camera_port_argument = DeclareLaunchArgument('camera_port', default_value='1181')
     fps_argument = DeclareLaunchArgument('fps', default_value='30')
     pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='rgb24')
-    launch_camera_server_argument = DeclareLaunchArgument('launch_camera_server_argument', default_value='True')
+    launch_camera_server_argument = DeclareLaunchArgument('launch_camera_server', default_value='False')
     usb_node = ComposableNode(
         package='usb_cam',
         plugin='usb_cam::UsbCamNode',
