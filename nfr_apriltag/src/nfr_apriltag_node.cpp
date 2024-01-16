@@ -85,9 +85,9 @@ namespace nfr
                     auto cameraToTag = buffer->lookupTransform(detections.header.frame_id, detection.family + ":" + std::to_string(detection.id),
                         tf2::TimePointZero);
                     tf2::Transform baseToCameraTransform;
-                    tf2::fromMsg(baseToCamera, baseToCameraTransform);
+                    tf2::fromMsg(baseToCamera.transform, baseToCameraTransform);
                     tf2::Transform cameraToTagTransform;
-                    tf2::fromMsg(cameraToTag, cameraToTagTransform);
+                    tf2::fromMsg(cameraToTag.transform, cameraToTagTransform);
                     auto worldToTag = tagPoses[detection.id];
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = "map";
@@ -97,6 +97,14 @@ namespace nfr
                     pose.pose.pose.position.x = worldToRobot.getOrigin().getX();
                     pose.pose.pose.position.y = worldToRobot.getOrigin().getY();
                     pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
+                    pose.pose.covariance = {
+                        1e-6, 0, 0, 0, 0, 0,
+                        0, 1e-6, 0, 0, 0, 0,
+                        0, 0, 1e-6, 0, 0, 0,
+                        0, 0, 0, 1e-6, 0, 0,
+                        0, 0, 0, 0, 1e-6, 0,
+                        0, 0, 0, 0, 0, 1e-6
+                    };
                     publisher->publish(pose);
                     nfr_msgs::msg::Target target;
                     target.header = detections.header;

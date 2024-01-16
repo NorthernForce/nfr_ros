@@ -26,9 +26,9 @@ def generate_launch_description():
     pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='rgb24')
     launch_camera_server_argument = DeclareLaunchArgument('launch_camera_server', default_value='False')
     usb_node = ComposableNode(
-        package='usb_cam',
-        plugin='usb_cam::UsbCamNode',
-        name='usb_camera',
+        package='v4l2_camera',
+        plugin='v4l2_camera::V4L2Camera',
+        name='v4l2_camera',
         namespace='',
         parameters=[{
             'video_device': camera_path,

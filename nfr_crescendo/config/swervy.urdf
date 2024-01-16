@@ -1,9 +1,9 @@
 <robot name="swervy">
     <link name="base_link"/>
-    <link name="camera_link"/>
-    <joint name="realsense_joint" type="fixed">
+    <link name="camera"/>
+    <joint name="usb_camera_joint" type="fixed">
         <parent link="base_link"/>
-        <child link="camera_link"/>
-        <origin xyz="0.405 0 0.18" rpy="0 0 0"/>
+        <child link="camera"/>
+        <origin xyz="0.405 0 0.18" rpy="0 0 90"/>
     </joint>
 </robot>

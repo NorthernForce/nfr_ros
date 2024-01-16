@@ -28,7 +28,7 @@ namespace nfr
         struct
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber deltaX, deltaY;
+            nt::DoubleSubscriber deltaX, deltaY, deltaTheta;
             nt::IntegerSubscriber stamp;
             rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher;
         } odometry;
@@ -72,7 +72,7 @@ namespace nfr
         struct
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber theta;
+            nt::DoubleSubscriber deltaTheta;
             nt::IntegerSubscriber stamp;
             rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher;
         } imu;
@@ -89,13 +89,14 @@ namespace nfr
                 odometry.table = table->GetSubTable("odometry");
                 odometry.deltaX = odometry.table->GetDoubleTopic("vx").Subscribe(0.0);
                 odometry.deltaY = odometry.table->GetDoubleTopic("vy").Subscribe(0.0);
+                odometry.deltaTheta = odometry.table->GetDoubleTopic("vtheta").Subscribe(0.0);
                 odometry.stamp = odometry.table->GetIntegerTopic("stamp").Subscribe(0);
                 odometry.publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
                 instance.AddListener(odometry.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
             }
             {
                 imu.table = table->GetSubTable("imu");
-                imu.theta = imu.table->GetDoubleTopic("theta").Subscribe(0.0);
+                imu.deltaTheta = imu.table->GetDoubleTopic("vtheta").Subscribe(0.0);
                 imu.stamp = imu.table->GetIntegerTopic("stamp").Subscribe(0);
                 imu.publisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
                 instance.AddListener(imu.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receiveIMU, this, std::placeholders::_1));
@@ -152,7 +153,7 @@ namespace nfr
                         tf2::Matrix3x3(quaternion).getRPY(roll, pitch, yaw);
                         pose.theta.Set(yaw);
                         auto stamp = rclcpp::Time(transform.header.stamp);
-                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
+                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
                         pose.stamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)stamp.nanoseconds() + offset)).count());
                     }
                 });
@@ -182,7 +183,7 @@ namespace nfr
                         tx.push_back(msg.targets[i].center.x);
                         ty.push_back(msg.targets[i].center.y);
                         fiducialID.push_back(msg.targets[i].fiducial_id);
-                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value();
+                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
                         stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
                             ((rclcpp::Time)msg.targets[i].header.stamp).nanoseconds() + offset)).count());
                     }
@@ -197,7 +198,7 @@ namespace nfr
             }
             buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             listener = std::make_shared<tf2_ros::TransformListener>(*buffer);
-            auto hosts = declare_parameter("hosts", std::vector<std::string>({"10.1.72.2:5810", "localhost:5810"}));
+            instance.SetServerTeam(172);
             std::string clientName = declare_parameter("client_name", "xavier");
             instance.StartClient4(clientName);
             RCLCPP_INFO(get_logger(), "Started NT client4 as '%s'", clientName.c_str());
@@ -205,7 +206,7 @@ namespace nfr
         inline rclcpp::Time toHostTime(std::chrono::nanoseconds timestamp)
         {
             return rclcpp::Time(((std::chrono::nanoseconds)(timestamp -
-                (std::chrono::microseconds)instance.GetServerTimeOffset().value())).count());
+                (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0))).count());
         }
         void recieveOdometry(const nt::Event& event)
         {
@@ -221,7 +222,15 @@ namespace nfr
             msg.header.stamp = toHostTime(timestamp);
             msg.twist.twist.linear.x = odometry.deltaX.Get();
             msg.twist.twist.linear.y = odometry.deltaY.Get();
-            RCLCPP_INFO(get_logger(), "Recieved odometry");
+            msg.twist.twist.angular.z = odometry.deltaTheta.Get();
+            msg.twist.covariance = {
+                1e-6, 0, 0, 0, 0, 0,
+                0, 1e-6, 0, 0, 0, 0,
+                0, 0, 1e-6, 0, 0, 0,
+                0, 0, 0, 1e-6, 0, 0,
+                0, 0, 0, 0, 1e-6, 0,
+                0, 0, 0, 0, 0, 1e-6
+            };
             odometry.publisher->publish(msg);
         }
         void receiveIMU(const nt::Event& event)
@@ -235,9 +244,12 @@ namespace nfr
             msg.header.frame_id = "base_link";
             std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)imu.stamp.Get();
             msg.header.stamp = toHostTime(timestamp);
-            tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, imu.theta.Get());
-            msg.orientation = tf2::toMsg(quaternion);
+            msg.angular_velocity.z = imu.deltaTheta.Get();
+            msg.angular_velocity_covariance = {
+                1e-6, 0, 0,
+                0, 1e-6, 0,
+                0, 0, 1e-6
+            };
             imu.publisher->publish(msg);
         }
         void recieveGlobalSetPose(const nt::Event& event)

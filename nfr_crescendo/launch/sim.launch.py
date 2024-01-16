@@ -19,7 +19,7 @@ def generate_launch_description():
                 ),
                 launch_arguments=[
                     ('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json')),
-                    # ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
+                    ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
                     ('pixel_format', 'yuyv'),
                     ('resolution_width', '640'),
                     ('resolution_height', '480'),

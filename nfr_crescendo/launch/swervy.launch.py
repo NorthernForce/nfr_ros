@@ -48,58 +48,12 @@ def generate_launch_description():
             ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
-    local_localization = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='local_ekf_node',
-        parameters=[{
-            'odom0': '/odom',
-            'odom0_config': [
-                False, False, False, False, False, False,
-                True, True, False, False, False, False,
-                False, False, False
-            ],
-            'odom0_differential': True,
-            'imu0': '/imu',
-            'imu0_config': [
-                False, False, False, False, False, True,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
-            'world_frame': 'odom'
-        }],
-        remappings=[
-            ('set_pose', 'local_set_pose')
-        ]
-    )
-    global_localization = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='global_ekf_node',
-        parameters=[{
-            'odom0': '/odom',
-            'odom0_config': [
-                False, False, False, False, False, False,
-                True, True, False, False, False, False,
-                False, False, False
-            ],
-            'odom0_differential': True,
-            'imu0': '/imu',
-            'imu0_config': [
-                False, False, False, False, False, True,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
-            'pose0': '/usb_cam1/pose_estimations',
-            'pose0_config': [
-                True, True, False, False, False, False,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
-            'world_frame': 'map'
-        }],
-        remappings=[
-            ('set_pose', 'global_set_pose')
+    localization = Node(
+        package='fuse_optimizers',
+        executable='fixed_lag_smoother_node',
+        name='localization_node',
+        parameters=[
+            os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'fuse.yaml')
         ]
     )
     bridge_node = Node(
@@ -145,8 +99,7 @@ def generate_launch_description():
         robot_state_publisher,
         apriltag_launch,
         navigation_launch,
-        local_localization,
-        global_localization,
+        localization,
         bridge_node,
         camera_node,
         note_detection_node
