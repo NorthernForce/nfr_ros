@@ -42,9 +42,9 @@ def generate_launch_description():
         }]
     )
     usb_node = ComposableNode(
-        package='usb_cam',
-        plugin='usb_cam::UsbCamNode',
-        name='usb_camera',
+        package='v4l2_camera',
+        plugin='v4l2_camera::V4L2Camera',
+        name='v4l2_camera',
         namespace='',
         parameters=[{
             'video_device': camera_path,
@@ -77,7 +77,7 @@ def generate_launch_description():
     nfr_apriltag_node = ComposableNode(
         package='nfr_apriltag',
         plugin='nfr::AprilTagLocalizationNode',
-        name='realsense_localization',
+        name='usb_localization',
         namespace='',
         parameters=[{
             'field_path': field_path,
@@ -89,27 +89,26 @@ def generate_launch_description():
         executable='component_container_mt',
         namespace='',
         composable_node_descriptions=[
-            # nfr_apriltag_node,
+            nfr_apriltag_node,
             rectify_node,
             apriltag_node,
             usb_node
-        ],
-        respawn=True
+        ]
     )
-    # camera_node = Node(
-    #     package='nfr_camera',
-    #     name='nfr_camera_node',
-    #     executable='nfr_camera_node',
-    #     namespace='',
-    #     parameters=[{
-    #         'camera_name': camera_name,
-    #         'resolution_width': resolution_width,
-    #         'resolution_height': resolution_height,
-    #         'camera_port': camera_port,
-    #         'fps': fps
-    #     }],
-    #     condition=IfCondition(launch_camera_server)
-    # )
+    camera_node = Node(
+        package='nfr_camera',
+        name='nfr_camera_node',
+        executable='nfr_camera_node',
+        namespace='',
+        parameters=[{
+            'camera_name': camera_name,
+            'resolution_width': resolution_width,
+            'resolution_height': resolution_height,
+            'camera_port': camera_port,
+            'fps': fps
+        }],
+        condition=IfCondition(launch_camera_server)
+    )
     return LaunchDescription([
         tag_size_argument,
         resolution_width_argument,
@@ -123,6 +122,6 @@ def generate_launch_description():
         pixel_format_argument,
         launch_camera_server_argument,
         fps_argument,
-        usb_container
-        # camera_node
+        usb_container,
+        camera_node
     ])

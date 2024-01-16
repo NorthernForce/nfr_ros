@@ -5,9 +5,9 @@ from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 import os
 def generate_launch_description():
-    with open(os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'swervy.urdf')) as f:
+    with open(os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'swervy.urdf')) as f:
         robot_desc = f.read()
-    usb_cam_launch = GroupAction(
+    apriltag_launch = GroupAction(
         actions=[
             PushRosNamespace('usb_cam1'),
             IncludeLaunchDescription(
@@ -17,8 +17,14 @@ def generate_launch_description():
                         '/usb_apriltag.launch.py'
                     ]
                 ),
-                launch_arguments=[('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json')),
-                                  ('camera_info_url', 'package://nfr_crescendo/config/ost.yaml')]
+                launch_arguments=[
+                    ('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json')),
+                    # ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
+                    ('pixel_format', 'yuyv'),
+                    ('resolution_width', '640'),
+                    ('resolution_height', '480'),
+                    ('camera_path', '/dev/video0')
+                ]
             )
         ]
     )
@@ -38,7 +44,8 @@ def generate_launch_description():
             ]
         ),
         launch_arguments=[
-            ('params_file', os.path.join(get_package_share_directory('nfr_charged_up'), 'config', 'swervy_nav2.yaml'))
+            ('params_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'swervy_nav2.yaml')),
+            ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
     local_localization = Node(
@@ -103,33 +110,44 @@ def generate_launch_description():
             'target_cameras': ['usb_cam1', 'usb_cam2']
         }]
     )
-    camera_node = Node(
-        package='nfr_camera',
-        executable='nfr_camera_node',
-        name='nfr_camera_node',
-        namespace='usb_cam',
-        parameters=[{
-            'camera_path': 'image',
-            'camera_name': 'USBCam'
-        }]
-    )
-    note_detection_node = Node(
-        package='nfr_note_detector',
-        executable='nfr_note_detector_node',
-        name='nfr_note_detector_node',
-        namespace='usb_cam',
-        parameters=[{
-            'camera_path': 'image',
-            'camera_name': 'USBCam'
-        }]
-    )
+    # camera_node = GroupAction(
+    #     actions = [
+    #         PushRosNamespace('usb_cam2'),
+    #         IncludeLaunchDescription(
+    #             PythonLaunchDescriptionSource([
+    #                 os.path.join(get_package_share_directory('nfr_camera'), 'launch'),
+    #                 '/usb_cam.launch.py'
+    #             ]),
+    #             launch_arguments=[
+    #                 ('camera_path', '/dev/video2'),
+    #                 ('camera_name', 'usb_cam2'),
+    #                 ('camera_port', '1182'),
+    #                 ('resolution_width', '640'),
+    #                 ('resolution_height', '480'),
+    #                 ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
+    #                 ('pixel_format', 'yuyv')
+    #             ]
+    #         )
+    #     ]
+    # )
+    # note_detection_node = Node(
+    #     package='nfr_note_detector',
+    #     executable='nfr_note_detector_node',
+    #     name='nfr_note_detector_node',
+    #     namespace='usb_cam2',
+    #     parameters=[{
+    #         'camera_path': 'image',
+    #         'camera_name': 'USBCam',
+    #         'camera_port': 1183
+    #     }]
+    # )
     return LaunchDescription([
         robot_state_publisher,
-        usb_cam_launch,
+        apriltag_launch,
         navigation_launch,
         local_localization,
         global_localization,
         bridge_node,
-        camera_node,
-        note_detection_node
+        # camera_node,
+        # note_detection_node
     ])
