@@ -48,10 +48,18 @@ def generate_launch_description():
             ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
-    localization = Node(
+    local_localization_node = Node(
         package='fuse_optimizers',
         executable='fixed_lag_smoother_node',
-        name='localization_node',
+        name='local_localization_node',
+        parameters=[
+            os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'fuse.yaml')
+        ]
+    )
+    global_localization_node = Node(
+        package='fuse_optimizers',
+        executable='fixed_lag_smoother_node',
+        name='global_localization_node',
         parameters=[
             os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'fuse.yaml')
         ]
@@ -99,7 +107,8 @@ def generate_launch_description():
         robot_state_publisher,
         apriltag_launch,
         navigation_launch,
-        localization,
+        local_localization_node,
+        global_localization_node,
         bridge_node,
         camera_node,
         note_detection_node
