@@ -2,7 +2,7 @@ from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch.conditions import IfCondition
 from launch import LaunchDescription
 def generate_launch_description():
@@ -18,7 +18,7 @@ def generate_launch_description():
     fps = LaunchConfiguration('fps')
     pixel_format = LaunchConfiguration('pixel_format')
     launch_camera_server = LaunchConfiguration('launch_camera_server')
-    tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.18')
+    tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.16')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
     camera_path_argument = DeclareLaunchArgument('camera_path', default_value='/dev/video0')
@@ -48,7 +48,7 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'video_device': camera_path,
-            'image_width': resolution_width,
+            'image_size': PythonExpression(['[', resolution_width, ',', resolution_height, ']']),
             'image_height': resolution_height,
             'camera_frame_id': frame_id,
             'camera_name': frame_id,

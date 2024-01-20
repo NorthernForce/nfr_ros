@@ -19,10 +19,10 @@ def generate_launch_description():
                 ),
                 launch_arguments=[
                     ('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json')),
-                    ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
+                    ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-1920x1080.yaml'),
                     ('pixel_format', 'yuyv'),
-                    ('resolution_width', '640'),
-                    ('resolution_height', '480'),
+                    ('resolution_width', '1920'),
+                    ('resolution_height', '1080'),
                     ('camera_path', '/dev/video0')
                 ]
             )
@@ -48,69 +48,13 @@ def generate_launch_description():
             ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
-    local_localization = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='local_ekf_node',
-        parameters=[{
-            'odom0': '/odom',
-            'odom0_config': [
-                False, False, False, False, False, False,
-                True, True, False, False, False, False,
-                False, False, False
-            ],
-            'odom0_queue_size': 10,
-            'imu0': '/imu',
-            'imu0_config': [
-                False, False, False, False, False, True,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
-            'imu0_queue_size': 10,
-            'world_frame': 'odom',
-            # 'debug': True,
-        }],
-        remappings=[
-            ('set_pose', 'local_set_pose')
-        ]
-    )
-    global_localization = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='global_ekf_node',
-        parameters=[{
-            'odom0': '/odom',
-            'odom0_config': [
-                False, False, False, False, False, False,
-                True, True, False, False, False, False,
-                False, False, False
-            ],
-            'odom0_queue_size': 10,
-            'imu0': '/imu',
-            'imu0_config': [
-                False, False, False, False, False, True,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
-            'imu0_queue_size': 10,
-            'pose0': '/usb_cam1/pose_estimations',
-            'pose0_config': [
-                True, True, False, False, False, False,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
-            'world_frame': 'map',
-        }],
-        remappings=[
-            ('set_pose', 'global_set_pose')
-        ]
-    )
     bridge_node = Node(
         package='nfr_bridge',
         executable='nfr_bridge_node',
         name='nfr_bridge_node',
         parameters=[{
-            'target_cameras': ['usb_cam1', 'usb_cam2']
+            'target_cameras': ['usb_cam1', 'usb_cam2'],
+            'pose_suppliers': ['usb_cam1']
         }]
     )
     camera_node = GroupAction(
@@ -148,8 +92,6 @@ def generate_launch_description():
         robot_state_publisher,
         apriltag_launch,
         navigation_launch,
-        local_localization,
-        global_localization,
         bridge_node,
         camera_node,
         note_detection_node

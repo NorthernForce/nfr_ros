@@ -35,7 +35,7 @@ namespace nfr
         {
             subscription = create_subscription<AprilTagDetectionArray>("tag_detections", rclcpp::SensorDataQoS(),
                 std::bind(&AprilTagLocalizationNode::detectionCallback, this, _1));
-            publisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_estimations", rclcpp::SensorDataQoS());
+            publisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_estimations", 10);
             targetPublisher = create_publisher<nfr_msgs::msg::TargetList>("targets", 10);
             infoSubscription = create_subscription<sensor_msgs::msg::CameraInfo>("camera_info", 10, [&](const sensor_msgs::msg::CameraInfo& msg)
             {
@@ -89,22 +89,23 @@ namespace nfr
                     tf2::Transform cameraToTagTransform;
                     tf2::fromMsg(cameraToTag.transform, cameraToTagTransform);
                     auto worldToTag = tagPoses[detection.id];
+                    RCLCPP_INFO(get_logger(), "Tag estimated to be %f meters forward, %f meters tall, %f meters to the left",
+                        cameraToTag.transform.translation.x, cameraToTag.transform.translation.y, cameraToTag.transform.translation.z);
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = "map";
                     pose.header.stamp = detections.header.stamp;
-                    tf2::Transform worldToRobot = worldToTag * (baseToCameraTransform * cameraToTagTransform).inverse();
-                    pose.pose.pose.orientation = tf2::toMsg(worldToRobot.getRotation());
-                    pose.pose.pose.position.x = worldToRobot.getOrigin().getX();
-                    pose.pose.pose.position.y = worldToRobot.getOrigin().getY();
-                    pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
-                    // pose.pose.covariance = {
-                    //     0.01, 0, 0, 0, 0, 0,
-                    //     0, 0.01, 0, 0, 0, 0,
-                    //     0, 0, 0.01, 0, 0, 0,
-                    //     0, 0, 0, 0.001, 0, 0,
-                    //     0, 0, 0, 0, 0.001, 0,
-                    //     0, 0, 0, 0, 0, 0.001
-                    // };
+                    pose.pose.pose.position.x = worldToTag.getOrigin().getX();
+                    pose.pose.pose.position.y = worldToTag.getOrigin().getY();
+                    pose.pose.pose.position.z = worldToTag.getOrigin().getZ();
+                    pose.pose.pose.position.x -= baseToCamera.transform.translation.x + cameraToTag.transform.translation.z;
+                    pose.pose.pose.position.y -= baseToCamera.transform.translation.y + cameraToTag.transform.translation.x;
+                    pose.pose.pose.position.z -= baseToCamera.transform.translation.z + cameraToTag.transform.translation.y;
+                    tf2::Quaternion baseToCameraQuaternion;
+                    tf2::fromMsg(baseToCamera.transform.rotation, baseToCameraQuaternion);
+                    tf2::Quaternion cameraToTagQuaternion;
+                    tf2::fromMsg(cameraToTag.transform.rotation, cameraToTagQuaternion);
+                    tf2::Quaternion worldToRobot = worldToTag * cameraToTagQuaternion.inverse() * cameraToTagQuaternion.inverse();
+                    pose.pose.pose.orientation = tf2::toMsg(worldToRobot);
                     publisher->publish(pose);
                     nfr_msgs::msg::Target target;
                     target.header = detections.header;
@@ -117,6 +118,7 @@ namespace nfr
                     targets.targets.push_back(target);
                 }
             }
+            targetPublisher->publish(targets);
         }
     };
 }
