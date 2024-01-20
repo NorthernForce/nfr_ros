@@ -48,20 +48,61 @@ def generate_launch_description():
             ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
-    local_localization_node = Node(
-        package='fuse_optimizers',
-        executable='fixed_lag_smoother_node',
-        name='local_localization_node',
-        parameters=[
-            os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'fuse.yaml')
+    local_localization = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='local_ekf_node',
+        parameters=[{
+            'odom0': '/odom',
+            'odom0_config': [
+                False, False, False, False, False, False,
+                True, True, False, False, False, False,
+                False, False, False
+            ],
+            'odom0_queue_size': 10,
+            'imu0': '/imu',
+            'imu0_config': [
+                False, False, False, False, False, True,
+                False, False, False, False, False, False,
+                False, False, False
+            ],
+            'imu0_queue_size': 10,
+            'world_frame': 'odom',
+            # 'debug': True,
+        }],
+        remappings=[
+            ('set_pose', 'local_set_pose')
         ]
     )
-    global_localization_node = Node(
-        package='fuse_optimizers',
-        executable='fixed_lag_smoother_node',
-        name='global_localization_node',
-        parameters=[
-            os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'fuse.yaml')
+    global_localization = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='global_ekf_node',
+        parameters=[{
+            'odom0': '/odom',
+            'odom0_config': [
+                False, False, False, False, False, False,
+                True, True, False, False, False, False,
+                False, False, False
+            ],
+            'odom0_queue_size': 10,
+            'imu0': '/imu',
+            'imu0_config': [
+                False, False, False, False, False, True,
+                False, False, False, False, False, False,
+                False, False, False
+            ],
+            'imu0_queue_size': 10,
+            'pose0': '/usb_cam1/pose_estimations',
+            'pose0_config': [
+                True, True, False, False, False, False,
+                False, False, False, False, False, False,
+                False, False, False
+            ],
+            'world_frame': 'map',
+        }],
+        remappings=[
+            ('set_pose', 'global_set_pose')
         ]
     )
     bridge_node = Node(
@@ -107,8 +148,8 @@ def generate_launch_description():
         robot_state_publisher,
         apriltag_launch,
         navigation_launch,
-        local_localization_node,
-        global_localization_node,
+        local_localization,
+        global_localization,
         bridge_node,
         camera_node,
         note_detection_node

@@ -28,7 +28,7 @@ namespace nfr
         struct
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber deltaX, deltaY, deltaTheta;
+            nt::DoubleSubscriber x, y, deltaX, deltaY, deltaTheta;
             nt::IntegerSubscriber stamp;
             rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher;
         } odometry;
@@ -72,7 +72,7 @@ namespace nfr
         struct
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber deltaTheta;
+            nt::DoubleSubscriber theta, deltaTheta;
             nt::IntegerSubscriber stamp;
             rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher;
         } imu;
@@ -90,12 +90,15 @@ namespace nfr
                 odometry.deltaX = odometry.table->GetDoubleTopic("vx").Subscribe(0.0);
                 odometry.deltaY = odometry.table->GetDoubleTopic("vy").Subscribe(0.0);
                 odometry.deltaTheta = odometry.table->GetDoubleTopic("vtheta").Subscribe(0.0);
+                odometry.x = odometry.table->GetDoubleTopic("x").Subscribe(0.0);
+                odometry.y = odometry.table->GetDoubleTopic("y").Subscribe(0.0);
                 odometry.stamp = odometry.table->GetIntegerTopic("stamp").Subscribe(0);
                 odometry.publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
                 instance.AddListener(odometry.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
             }
             {
                 imu.table = table->GetSubTable("imu");
+                imu.theta = imu.table->GetDoubleTopic("theta").Subscribe(0.0);
                 imu.deltaTheta = imu.table->GetDoubleTopic("vtheta").Subscribe(0.0);
                 imu.stamp = imu.table->GetIntegerTopic("stamp").Subscribe(0);
                 imu.publisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
@@ -220,17 +223,19 @@ namespace nfr
             msg.header.frame_id = "odom";
             std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)odometry.stamp.Get();
             msg.header.stamp = toHostTime(timestamp);
+            msg.pose.pose.position.x = odometry.x.Get();
+            msg.pose.pose.position.y = odometry.y.Get();
             msg.twist.twist.linear.x = odometry.deltaX.Get();
             msg.twist.twist.linear.y = odometry.deltaY.Get();
             msg.twist.twist.angular.z = odometry.deltaTheta.Get();
-            msg.twist.covariance = {
-                1e-6, 0, 0, 0, 0, 0,
-                0, 1e-6, 0, 0, 0, 0,
-                0, 0, 1e-6, 0, 0, 0,
-                0, 0, 0, 1e-6, 0, 0,
-                0, 0, 0, 0, 1e-6, 0,
-                0, 0, 0, 0, 0, 1e-6
-            };
+            // msg.twist.covariance = {
+            //     0.1, 0, 0, 0, 0, 0,
+            //     0, 0.1, 0, 0, 0, 0,
+            //     0, 0, 0.1, 0, 0, 0,
+            //     0, 0, 0, 0.1, 0, 0,
+            //     0, 0, 0, 0, 0.1, 0,
+            //     0, 0, 0, 0, 0, 0.1
+            // };
             odometry.publisher->publish(msg);
         }
         void receiveIMU(const nt::Event& event)
@@ -241,15 +246,18 @@ namespace nfr
                 return;
             }
             sensor_msgs::msg::Imu msg;
-            msg.header.frame_id = "base_link";
+            msg.header.frame_id = "odom";
             std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)imu.stamp.Get();
             msg.header.stamp = toHostTime(timestamp);
+            tf2::Quaternion quaternion;
+            quaternion.setRPY(0, 0, imu.theta.Get());
+            msg.orientation = tf2::toMsg(quaternion);
             msg.angular_velocity.z = imu.deltaTheta.Get();
-            msg.angular_velocity_covariance = {
-                1e-6, 0, 0,
-                0, 1e-6, 0,
-                0, 0, 1e-6
-            };
+            // msg.angular_velocity_covariance = {
+            //     0.1, 0, 0,
+            //     0, 0.1, 0,
+            //     0, 0, 0.1
+            // };
             imu.publisher->publish(msg);
         }
         void recieveGlobalSetPose(const nt::Event& event)

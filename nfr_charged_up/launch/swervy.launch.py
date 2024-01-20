@@ -51,12 +51,12 @@ def generate_launch_description():
                 False, False, False
             ],
             'odom0_differential': True,
-            'imu0': '/imu',
-            'imu0_config': [
-                False, False, False, False, False, True,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
+            # 'imu0': '/imu',
+            # 'imu0_config': [
+            #     False, False, False, False, False, True,
+            #     False, False, False, False, False, False,
+            #     False, False, False
+            # ],
             'world_frame': 'odom'
         }],
         remappings=[
@@ -75,12 +75,12 @@ def generate_launch_description():
                 False, False, False
             ],
             'odom0_differential': True,
-            'imu0': '/imu',
-            'imu0_config': [
-                False, False, False, False, False, True,
-                False, False, False, False, False, False,
-                False, False, False
-            ],
+            # 'imu0': '/imu',
+            # 'imu0_config': [
+            #     False, False, False, False, False, True,
+            #     False, False, False, False, False, False,
+            #     False, False, False
+            # ],
             'pose0': '/realsense/pose_estimations',
             'pose0_config': [
                 True, True, False, False, False, False,

@@ -97,14 +97,14 @@ namespace nfr
                     pose.pose.pose.position.x = worldToRobot.getOrigin().getX();
                     pose.pose.pose.position.y = worldToRobot.getOrigin().getY();
                     pose.pose.pose.position.z = worldToRobot.getOrigin().getZ();
-                    pose.pose.covariance = {
-                        1e-6, 0, 0, 0, 0, 0,
-                        0, 1e-6, 0, 0, 0, 0,
-                        0, 0, 1e-6, 0, 0, 0,
-                        0, 0, 0, 1e-6, 0, 0,
-                        0, 0, 0, 0, 1e-6, 0,
-                        0, 0, 0, 0, 0, 1e-6
-                    };
+                    // pose.pose.covariance = {
+                    //     0.01, 0, 0, 0, 0, 0,
+                    //     0, 0.01, 0, 0, 0, 0,
+                    //     0, 0, 0.01, 0, 0, 0,
+                    //     0, 0, 0, 0.001, 0, 0,
+                    //     0, 0, 0, 0, 0.001, 0,
+                    //     0, 0, 0, 0, 0, 0.001
+                    // };
                     publisher->publish(pose);
                     nfr_msgs::msg::Target target;
                     target.header = detections.header;
