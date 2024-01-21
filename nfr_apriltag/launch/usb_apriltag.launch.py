@@ -31,16 +31,6 @@ def generate_launch_description():
     fps_argument = DeclareLaunchArgument('fps', default_value='30')
     pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='yuyv')
     launch_camera_server_argument = DeclareLaunchArgument('launch_camera_server', default_value='False')
-    rectify_node = ComposableNode(
-        package='image_proc',
-        plugin='image_proc::RectifyNode',
-        name='usb_rectify',
-        namespace='',
-        parameters=[{
-            'output_width': resolution_width,
-            'output_height': resolution_height
-        }]
-    )
     usb_node = ComposableNode(
         package='v4l2_camera',
         plugin='v4l2_camera::V4L2Camera',
@@ -77,7 +67,6 @@ def generate_launch_description():
         namespace='',
         composable_node_descriptions=[
             nfr_apriltag_node,
-            rectify_node,
             usb_node
         ]
     )
