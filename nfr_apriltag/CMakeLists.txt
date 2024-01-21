@@ -18,15 +18,20 @@ find_package(rclcpp_components REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nfr_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(apriltag 3.2 REQUIRED)
+find_package(OpenCV REQUIRED)
 add_library(nfr_apriltag_node SHARED src/nfr_apriltag_node.cpp)
 target_include_directories(nfr_apriltag_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(nfr_apriltag_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++20
-ament_target_dependencies(nfr_apriltag_node tf2 tf2_ros geometry_msgs tf2_geometry_msgs ament_index_cpp rclcpp rclcpp_components apriltag_msgs
+ament_target_dependencies(nfr_apriltag_node tf2 tf2_ros geometry_msgs tf2_geometry_msgs ament_index_cpp rclcpp rclcpp_components apriltag_msgs image_transport cv_bridge
   nfr_msgs sensor_msgs)
-rclcpp_components_register_nodes(nfr_apriltag_node "nfr::AprilTagLocalizationNode")
-set(node_plugins "${node_plugins}nfr::AprilTagLocalizationNode;$<TARGET_FILE:nfr_apriltag_node>\n")
+target_link_libraries(nfr_apriltag_node apriltag::apriltag ${OpenCV_LIBS})
+rclcpp_components_register_nodes(nfr_apriltag_node "nfr::NFRAprilTagNode")
+set(node_plugins "${node_plugins}nfr::NFRAprilTagNode;$<TARGET_FILE:nfr_apriltag_node>\n")
 install(TARGETS nfr_apriltag_node DESTINATION lib)
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
 if(BUILD_TESTING)

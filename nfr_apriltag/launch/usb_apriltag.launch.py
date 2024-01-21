@@ -59,28 +59,15 @@ def generate_launch_description():
             ('image_raw', 'image')
         ]
     )
-    apriltag_node = ComposableNode(
-        package='apriltag_ros',
-        plugin='AprilTagNode',
-        name='usb_apriltag',
-        namespace='',
-        parameters=[{
-            'size': tag_size,
-            'family': '36h11'
-        }],
-        remappings=[
-            ('camera/image_rect', 'image_rect'),
-            ('camera/camera_info', 'camera_info'),
-            ('detections', 'tag_detections')
-        ]
-    )
     nfr_apriltag_node = ComposableNode(
         package='nfr_apriltag',
-        plugin='nfr::AprilTagLocalizationNode',
+        plugin='nfr::NFRAprilTagNode',
         name='usb_localization',
         namespace='',
         parameters=[{
             'field_path': field_path,
+            'size': tag_size,
+            'family': '36h11'
         }]
     )
     usb_container = ComposableNodeContainer(
@@ -91,7 +78,6 @@ def generate_launch_description():
         composable_node_descriptions=[
             nfr_apriltag_node,
             rectify_node,
-            apriltag_node,
             usb_node
         ]
     )
