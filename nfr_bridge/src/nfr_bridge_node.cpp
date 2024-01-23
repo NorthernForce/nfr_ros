@@ -135,29 +135,7 @@ namespace nfr
                 camera.fiducialID = camera.table->GetIntegerArrayTopic("fiducial_id").Publish();
                 camera.stamp = camera.table->GetIntegerArrayTopic("stamp").Publish();
                 camera.subscription = create_subscription<nfr_msgs::msg::TargetList>(cameraNames[i] + "/targets", 10,
-                    [&](const nfr_msgs::msg::TargetList& msg) {
-                    std::vector<double> area, pitch, yaw, tx, ty;
-                    std::vector<long> fiducialID, stamp;
-                    for (size_t i = 0; i < msg.targets.size(); i++)
-                    {
-                        area.push_back(msg.targets[i].area);
-                        pitch.push_back(msg.targets[i].pitch);
-                        yaw.push_back(msg.targets[i].yaw);
-                        tx.push_back(msg.targets[i].center.x);
-                        ty.push_back(msg.targets[i].center.y);
-                        fiducialID.push_back(msg.targets[i].fiducial_id);
-                        std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
-                        stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
-                            ((rclcpp::Time)msg.targets[i].header.stamp).nanoseconds() + offset)).count());
-                    }
-                    camera.area.Set(area);
-                    camera.pitch.Set(pitch);
-                    camera.yaw.Set(yaw);
-                    camera.tx.Set(tx);
-                    camera.ty.Set(ty);
-                    camera.fiducialID.Set(fiducialID);
-                    camera.stamp.Set(stamp);
-                });
+                    std::bind(&NFRBridgeNode::sendDetection, this, std::placeholders::_1, i));
             }
             auto poseNames = declare_parameter("pose_suppliers", std::vector<std::string>());
             for (size_t i = 0; i < poseNames.size(); i++)
@@ -170,14 +148,7 @@ namespace nfr
                 supplier.theta = supplier.table->GetDoubleTopic("theta").Publish();
                 supplier.stamp = supplier.table->GetIntegerTopic("stamp").Publish();
                 supplier.subscription = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(poseNames[i] + "/pose_estimations", 10,
-                    [&](const geometry_msgs::msg::PoseWithCovarianceStamped& msg) {
-                    supplier.x.Set(msg.pose.pose.position.x);
-                    supplier.y.Set(msg.pose.pose.position.y);
-                    supplier.theta.Set(getYawFromQuaternion(msg.pose.pose.orientation));
-                    std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
-                    supplier.stamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
-                        ((rclcpp::Time)msg.header.stamp).nanoseconds() + offset)).count());
-                });
+                    std::bind(&NFRBridgeNode::sendPose, this, std::placeholders::_1, i));
             }
             broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
             instance.SetServerTeam(172);
@@ -189,6 +160,41 @@ namespace nfr
         {
             return rclcpp::Time(((std::chrono::nanoseconds)(timestamp -
                 (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0))).count());
+        }
+        void sendPose(const geometry_msgs::msg::PoseWithCovarianceStamped& msg, int i)
+        {
+            PoseSupplier& supplier = poseSuppliers[i];
+            supplier.x.Set(msg.pose.pose.position.x);
+            supplier.y.Set(msg.pose.pose.position.y);
+            supplier.theta.Set(getYawFromQuaternion(msg.pose.pose.orientation));
+            std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
+            supplier.stamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
+                ((rclcpp::Time)msg.header.stamp).nanoseconds() + offset)).count());
+        }
+        void sendDetection(const nfr_msgs::msg::TargetList& msg, int i)
+        {
+            std::vector<double> area, pitch, yaw, tx, ty;
+            std::vector<long> fiducialID, stamp;
+            for (size_t j = 0; j < msg.targets.size(); j++)
+            {
+                RCLCPP_INFO(get_logger(), "Processing detection");
+                area.push_back(msg.targets[j].area);
+                pitch.push_back(msg.targets[j].pitch);
+                yaw.push_back(msg.targets[j].yaw);
+                tx.push_back(msg.targets[j].center.x);
+                ty.push_back(msg.targets[j].center.y);
+                fiducialID.push_back(msg.targets[j].fiducial_id);
+                std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
+                stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
+                    ((rclcpp::Time)msg.targets[j].header.stamp).nanoseconds() + offset)).count());
+            }
+            cameras[i].area.Set(area);
+            cameras[i].pitch.Set(pitch);
+            cameras[i].yaw.Set(yaw);
+            cameras[i].tx.Set(tx);
+            cameras[i].ty.Set(ty);
+            cameras[i].fiducialID.Set(fiducialID);
+            cameras[i].stamp.Set(stamp);
         }
         void recieveOdometry(const nt::Event& event)
         {
