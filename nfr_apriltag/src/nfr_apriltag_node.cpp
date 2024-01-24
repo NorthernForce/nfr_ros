@@ -136,10 +136,10 @@ namespace nfr
                 target.header = image->header;
                 target.area = 0;
                 target.center.x = detectionMessage.centre.x;
-                target.center.x = detectionMessage.centre.y;
+                target.center.y = detectionMessage.centre.y;
                 target.fiducial_id = detectionMessage.id;
                 target.yaw = atan((target.center.x - cameraInfo->k[2]) / cameraInfo->k[0]);
-                target.pitch = atan((target.center.y - cameraInfo->k[4]) / (target.center.y / cameraInfo->k[5]));
+                target.pitch = atan((target.center.y - cameraInfo->k[5]) / cameraInfo->k[4]);
                 targets.targets.push_back(target);
                 if (zarray_size(detections) == 1)
                 {
