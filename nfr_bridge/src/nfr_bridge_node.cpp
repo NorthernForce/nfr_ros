@@ -125,30 +125,32 @@ namespace nfr
             for (size_t i = 0; i < cameraNames.size(); i++)
             {
                 cameras.push_back(TargetCamera());
-                TargetCamera& camera = cameras[i];
-                camera.table = table->GetSubTable(cameraNames[i]);
-                camera.area = camera.table->GetDoubleArrayTopic("area").Publish();
-                camera.pitch = camera.table->GetDoubleArrayTopic("pitch").Publish();
-                camera.yaw = camera.table->GetDoubleArrayTopic("yaw").Publish();
-                camera.tx = camera.table->GetDoubleArrayTopic("tx").Publish();
-                camera.ty = camera.table->GetDoubleArrayTopic("ty").Publish();
-                camera.fiducialID = camera.table->GetIntegerArrayTopic("fiducial_id").Publish();
-                camera.stamp = camera.table->GetIntegerArrayTopic("stamp").Publish();
-                camera.subscription = create_subscription<nfr_msgs::msg::TargetList>(cameraNames[i] + "/targets", 10,
-                    std::bind(&NFRBridgeNode::sendDetection, this, std::placeholders::_1, i));
+                cameras[i].table = table->GetSubTable(cameraNames[i]);
+                cameras[i].area = cameras[i].table->GetDoubleArrayTopic("area").Publish();
+                cameras[i].pitch = cameras[i].table->GetDoubleArrayTopic("pitch").Publish();
+                cameras[i].yaw = cameras[i].table->GetDoubleArrayTopic("yaw").Publish();
+                cameras[i].tx = cameras[i].table->GetDoubleArrayTopic("tx").Publish();
+                cameras[i].ty = cameras[i].table->GetDoubleArrayTopic("ty").Publish();
+                cameras[i].fiducialID = cameras[i].table->GetIntegerArrayTopic("fiducial_id").Publish();
+                cameras[i].stamp = cameras[i].table->GetIntegerArrayTopic("stamp").Publish();
+                std::function<void(const nfr_msgs::msg::TargetList&)> cameraCallback =
+                    std::bind(&NFRBridgeNode::sendDetection, this, std::placeholders::_1, i);
+                cameras[i].subscription = create_subscription<nfr_msgs::msg::TargetList>(cameraNames[i] + "/targets", 10,
+                    cameraCallback);
             }
             auto poseNames = declare_parameter("pose_suppliers", std::vector<std::string>());
             for (size_t i = 0; i < poseNames.size(); i++)
             {
                 poseSuppliers.push_back(PoseSupplier());
-                PoseSupplier& supplier = poseSuppliers[i];
-                supplier.table = table->GetSubTable("poses")->GetSubTable(poseNames[i]);
-                supplier.x = supplier.table->GetDoubleTopic("x").Publish();
-                supplier.y = supplier.table->GetDoubleTopic("y").Publish();
-                supplier.theta = supplier.table->GetDoubleTopic("theta").Publish();
-                supplier.stamp = supplier.table->GetIntegerTopic("stamp").Publish();
-                supplier.subscription = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(poseNames[i] + "/pose_estimations", 10,
-                    std::bind(&NFRBridgeNode::sendPose, this, std::placeholders::_1, i));
+                poseSuppliers[i].table = table->GetSubTable("poses")->GetSubTable(poseNames[i]);
+                poseSuppliers[i].x = poseSuppliers[i].table->GetDoubleTopic("x").Publish();
+                poseSuppliers[i].y = poseSuppliers[i].table->GetDoubleTopic("y").Publish();
+                poseSuppliers[i].theta = poseSuppliers[i].table->GetDoubleTopic("theta").Publish();
+                poseSuppliers[i].stamp = poseSuppliers[i].table->GetIntegerTopic("stamp").Publish();
+                std::function<void(const geometry_msgs::msg::PoseWithCovarianceStamped&)> poseCallback =
+                    std::bind(&NFRBridgeNode::sendPose, this, std::placeholders::_1, i);
+                poseSuppliers[i].subscription = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(poseNames[i] + "/pose_estimations", 10,
+                    poseCallback);
             }
             broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
             instance.SetServerTeam(172);
