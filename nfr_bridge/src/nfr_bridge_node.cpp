@@ -215,6 +215,14 @@ namespace nfr
             msg.twist.twist.linear.x = odometry.deltaX.Get();
             msg.twist.twist.linear.y = odometry.deltaY.Get();
             msg.twist.twist.angular.z = odometry.deltaTheta.Get();
+            msg.twist.covariance = {
+                0.81, 0, 0, 0, 0, 0,
+                0, 0.81, 0, 0, 0, 0,
+                0, 0, 1e6, 0, 0, 0,
+                0, 0, 0, 1e6, 0, 0,
+                0, 0, 0, 0, 1e6, 0,
+                0, 0, 0, 0, 0, 0.81
+            };
             odometry.publisher->publish(msg);
             geometry_msgs::msg::TransformStamped transform;
             transform.transform.translation.x = odometry.x.Get();

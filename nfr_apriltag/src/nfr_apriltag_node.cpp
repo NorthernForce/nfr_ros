@@ -32,6 +32,7 @@ namespace nfr
         apriltag_detector_t* detector;
         image_transport::CameraSubscriber cameraSubscription;
         rclcpp::Publisher<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr detectionPublisher;
+        double distanceFactor;
         int maxHamming;
         std::mutex mutex;
         std::unique_ptr<tf2_ros::Buffer> buffer;
@@ -54,6 +55,7 @@ namespace nfr
         NFRAprilTagNode(const rclcpp::NodeOptions& options) : rclcpp::Node("nfr_apriltag_node", options)
         {
             detector = apriltag_detector_create();
+            distanceFactor = declare_parameter("distance_factor", 0.1);
             std::string tagFamily = declare_parameter("family", "36h11");
             double tagEdgeSize = declare_parameter("size", 0.22);
             detector->nthreads = declare_parameter("detector.threads", detector->nthreads);
@@ -224,13 +226,22 @@ namespace nfr
                     rot.at<double>(2, 0), rot.at<double>(2, 1), rot.at<double>(2, 2)
                 );
                 tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
-                tf2::Transform poseEstimate = tf2::Transform(quaternion, translation) * baseToCameraTransform.inverse();
+                tf2::Transform poseEstimate = tf2::Transform(quaternion, translation).inverse() * baseToCameraTransform.inverse();
                 geometry_msgs::msg::PoseWithCovarianceStamped pose;
                 pose.header.stamp = image->header.stamp;
                 pose.header.frame_id = "map";
-                pose.pose.pose.position.x = -poseEstimate.getOrigin().getX();
+                pose.pose.pose.position.x = poseEstimate.getOrigin().getX();
                 pose.pose.pose.position.y = poseEstimate.getOrigin().getY();
                 pose.pose.pose.position.z = poseEstimate.getOrigin().getZ();
+                double distance = std::sqrt(std::pow(poseEstimate.getOrigin().getX(), 2) + std::pow(poseEstimate.getOrigin().getY(), 2));
+                pose.pose.covariance = {
+                    distanceFactor * distance, 0, 0, 0, 0, 0,
+                    0, distanceFactor * distance, 0, 0, 0, 0,
+                    0, 0, 1e3, 0, 0, 0,
+                    0, 0, 0, 1e3, 0, 0,
+                    0, 0, 0, 0, 1e3, 0,
+                    0, 0, 0, 0, 0, distanceFactor * distance
+                };
                 tf2::Quaternion flip;
                 flip.setRPY(0, 0, M_PI);
                 pose.pose.pose.orientation = tf2::toMsg(flip * poseEstimate.getRotation().inverse());
@@ -243,7 +254,7 @@ namespace nfr
                 for (size_t i = 0; i < zarray_size(detections); i++)
                 {
                     tf2::Transform fieldToTag = tagPoses[msg.detections[i].id];
-                    tf2::Transform poseEstimate = fieldToTag * cameraToTagEstimates[i] * baseToCameraTransform.inverse();
+                    tf2::Transform poseEstimate = fieldToTag * cameraToTagEstimates[i].inverse() * baseToCameraTransform.inverse();
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.stamp = image->header.stamp;
                     pose.header.frame_id = "map";
