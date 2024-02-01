@@ -21,7 +21,7 @@
 #include <Eigen/Dense>
 #include <tag36h11.h>
 #include <opencv2/calib3d.hpp>
-#include <math.h>
+#include <math.h>/
 using std::placeholders::_1;
 namespace nfr
 {
@@ -34,7 +34,7 @@ namespace nfr
         rclcpp::Publisher<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr detectionPublisher;
         double distanceFactor;
         int maxHamming;
-        bool useMultiTagPNP;
+        bool useMultiTagPNP, calculateDepth;
         std::mutex mutex;
         std::unique_ptr<tf2_ros::Buffer> buffer;
         std::shared_ptr<tf2_ros::TransformListener> listener;
@@ -79,6 +79,7 @@ namespace nfr
             detector->debug = declare_parameter("detector.debug", detector->debug);
             maxHamming = declare_parameter("max_hamming", 0);
             useMultiTagPNP = declare_parameter("use_multi_tag_pnp", false);
+            calculateDepth = declare_parameter("calculate_depth", true);
             family = tag36h11_create(); // 36h11 is assumed. Maybe add other tags later???
             apriltag_detector_add_family(detector, family);
             cameraSubscription = image_transport::CameraSubscriber(this, "image", std::bind(&NFRAprilTagNode::onCamera, this, std::placeholders::_1, std::placeholders::_2), "raw");
@@ -116,16 +117,8 @@ namespace nfr
             tf2::Matrix3x3 other{0, -1, 0, 0, 0, -1, 1, 0, 0};
             mat.getRotation(toOpenCVRotation);
         }
-        void onCamera(const sensor_msgs::msg::Image::ConstSharedPtr& image, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
+        void removeBadDetections(zarray_t* detections)
         {
-            cv::Mat monoImage = cv_bridge::toCvShare(image, "mono8")->image;
-            image_u8_t imageU8{monoImage.cols, monoImage.rows, monoImage.cols, monoImage.data};
-            mutex.lock();
-            auto detections = apriltag_detector_detect(detector, &imageU8);
-            mutex.unlock();
-            apriltag_msgs::msg::AprilTagDetectionArray msg;
-            std::vector<tf2::Transform> cameraToTagEstimates;
-            RCLCPP_INFO(get_logger(), "Detected %d tags", zarray_size(detections));
             for (size_t i = 0; i < zarray_size(detections); i++)
             {
                 apriltag_detection* detection;
@@ -136,66 +129,122 @@ namespace nfr
                     i--;
                 }
             }
+        }
+        apriltag_msgs::msg::AprilTagDetection createApriltagDetectionMessage(apriltag_detection* detection)
+        {
+            apriltag_msgs::msg::AprilTagDetection detectionMessage;
+            detectionMessage.family = std::string(detection->family->name);
+            detectionMessage.id = detection->id;
+            detectionMessage.hamming = detection->hamming;
+            detectionMessage.decision_margin = detection->decision_margin;
+            detectionMessage.centre.x = detection->c[0];
+            detectionMessage.centre.y = detection->c[1];
+            std::memcpy(detectionMessage.corners.data(), detection->p, sizeof(double) * 8);
+            std::memcpy(detectionMessage.homography.data(), detection->H->data, sizeof(double) * 9);
+            return detectionMessage;
+        }
+        nfr_msgs::msg::Target createTargetMessage(apriltag_detection* detection, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo, const std_msgs::msg::Header& header)
+        {
+            nfr_msgs::msg::Target target;
+            target.header = header;
+            target.area = 0;
+            target.center.x = detection->c[0];
+            target.center.y = detection->c[1];
+            target.fiducial_id = detection->id;
+            target.yaw = atan((target.center.x - cameraInfo->k[2]) / cameraInfo->k[0]);
+            target.pitch = atan((target.center.y - cameraInfo->k[5]) / cameraInfo->k[4]);
+        }
+        tf2::Transform singleTagPnP(apriltag_detection* detection, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
+        {
+            cv::Mat rvec(3, 1, CV_64FC1), tvec(3, 1, CV_64FC1);
+            std::vector<cv::Point2d> detectionCorners;
+            for (size_t i = 0; i < 4; i++)
+            {
+                detectionCorners.push_back(cv::Point2d(detection->p[i][0], detection->p[i][1]));
+            }
+            cv::Mat d(5, 1, CV_64FC1);
+            cv::Mat k(3, 3, CV_64FC1);
+            d.at<double>(0, 0) = cameraInfo->d[0];
+            d.at<double>(1, 0) = cameraInfo->d[1];
+            d.at<double>(2, 0) = cameraInfo->d[2];
+            d.at<double>(3, 0) = cameraInfo->d[3];
+            d.at<double>(4, 0) = cameraInfo->d[4];
+            k.at<double>(0, 0) = cameraInfo->k[0];
+            k.at<double>(0, 1) = cameraInfo->k[1];
+            k.at<double>(0, 2) = cameraInfo->k[2];
+            k.at<double>(1, 0) = cameraInfo->k[3];
+            k.at<double>(1, 1) = cameraInfo->k[4];
+            k.at<double>(1, 2) = cameraInfo->k[5];
+            k.at<double>(2, 0) = cameraInfo->k[6];
+            k.at<double>(2, 1) = cameraInfo->k[7];
+            k.at<double>(2, 2) = cameraInfo->k[8];
+            cv::solvePnP(corners, detectionCorners, k, d, rvec, tvec);
+            cv::Mat rot(3, 3, CV_64FC1);
+            cv::Rodrigues(rvec, rot);
+            auto quaternion = fromCV(rot);
+            tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
+            return tf2::Transform(quaternion, translation);
+        }
+        tf2::Transform multiTagPnP(zarray_t* detections, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
+        {
+            std::vector<cv::Point3d> cornerTransforms;
+            std::vector<cv::Point2d> detectionCorners;
+            for (size_t i = 0; i < zarray_size(detections); i++)
+            {
+                apriltag_detection* detection;
+                zarray_get(detections, i, &detection);
+                for (size_t j = 0; j < 4; j++)
+                {
+                    cornerTransforms.push_back(tagCorners[detection->id][j]);
+                    detectionCorners.push_back(cv::Point2d(detection[i].p[j][0], detection[i].p[j][1]));
+                }
+            }
+            cv::Mat d(5, 1, CV_64FC1);
+            cv::Mat k(3, 3, CV_64FC1);
+            d.at<double>(0, 0) = cameraInfo->d[0];
+            d.at<double>(1, 0) = cameraInfo->d[1];
+            d.at<double>(2, 0) = cameraInfo->d[2];
+            d.at<double>(3, 0) = cameraInfo->d[3];
+            d.at<double>(4, 0) = cameraInfo->d[4];
+            k.at<double>(0, 0) = cameraInfo->k[0];
+            k.at<double>(1, 0) = cameraInfo->k[1];
+            k.at<double>(2, 0) = cameraInfo->k[2];
+            k.at<double>(0, 1) = cameraInfo->k[3];
+            k.at<double>(1, 1) = cameraInfo->k[4];
+            k.at<double>(2, 1) = cameraInfo->k[5];
+            k.at<double>(0, 2) = cameraInfo->k[6];
+            k.at<double>(1, 2) = cameraInfo->k[7];
+            k.at<double>(2, 2) = cameraInfo->k[8];
+            cv::Mat rvec(3, 1, CV_64FC1), tvec(3, 1, CV_64FC1);
+            cv::solvePnP(cornerTransforms, detectionCorners, k, d, rvec, tvec, false, cv::SOLVEPNP_SQPNP);
+            cv::Mat rot(3, 3, CV_64FC1);
+            cv::Rodrigues(rvec, rot);
+            tf2::Quaternion quaternion = fromCV(rot);
+            tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
+            return tf2::Transform(quaternion, translation).inverse();
+        }
+        void onCamera(const sensor_msgs::msg::Image::ConstSharedPtr& image, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
+        {
+            cv::Mat monoImage = cv_bridge::toCvShare(image, "mono8")->image;
+            image_u8_t imageU8{monoImage.cols, monoImage.rows, monoImage.cols, monoImage.data};
+            mutex.lock();
+            auto detections = apriltag_detector_detect(detector, &imageU8);
+            mutex.unlock();
+            apriltag_msgs::msg::AprilTagDetectionArray msg;
+            std::vector<tf2::Transform> cameraToTagEstimates;
             RCLCPP_INFO(get_logger(), "Detected %d tags", zarray_size(detections));
+            removeBadDetections(detections);
+            RCLCPP_INFO(get_logger(), "Detected %d tags after removing bad tags", zarray_size(detections));
             nfr_msgs::msg::TargetList targets;
             for (size_t i = 0; i < zarray_size(detections); i++)
             {
                 apriltag_detection* detection;
                 zarray_get(detections, i, &detection);
-                apriltag_msgs::msg::AprilTagDetection detectionMessage;
-                detectionMessage.family = std::string(detection->family->name);
-                detectionMessage.id = detection->id;
-                detectionMessage.hamming = detection->hamming;
-                detectionMessage.decision_margin = detection->decision_margin;
-                detectionMessage.centre.x = detection->c[0];
-                detectionMessage.centre.y = detection->c[1];
-                std::memcpy(detectionMessage.corners.data(), detection->p, sizeof(double) * 8);
-                std::memcpy(detectionMessage.homography.data(), detection->H->data, sizeof(double) * 9);
-                msg.detections.push_back(detectionMessage);
-                nfr_msgs::msg::Target target;
-                target.header = image->header;
-                target.area = 0;
-                target.center.x = detectionMessage.centre.x;
-                target.center.y = detectionMessage.centre.y;
-                target.fiducial_id = detectionMessage.id;
-                target.yaw = atan((target.center.x - cameraInfo->k[2]) / cameraInfo->k[0]);
-                target.pitch = atan((target.center.y - cameraInfo->k[5]) / cameraInfo->k[4]);
-                targets.targets.push_back(target);
+                msg.detections.push_back(createApriltagDetectionMessage(detection));
+                targets.targets.push_back(createTargetMessage(detection, cameraInfo, image->header));
                 if (zarray_size(detections) == 1 || !useMultiTagPNP)
                 {
-                    cv::Mat rvec(3, 1, CV_64FC1), tvec(3, 1, CV_64FC1);
-                    std::vector<cv::Point2d> detectionCorners;
-                    for (size_t i = 0; i < 4; i++)
-                    {
-                        detectionCorners.push_back(cv::Point2d(detectionMessage.corners[i].x, detectionMessage.corners[i].y));
-                    }
-                    cv::Mat d(5, 1, CV_64FC1);
-                    cv::Mat k(3, 3, CV_64FC1);
-                    d.at<double>(0, 0) = cameraInfo->d[0];
-                    d.at<double>(1, 0) = cameraInfo->d[1];
-                    d.at<double>(2, 0) = cameraInfo->d[2];
-                    d.at<double>(3, 0) = cameraInfo->d[3];
-                    d.at<double>(4, 0) = cameraInfo->d[4];
-                    k.at<double>(0, 0) = cameraInfo->k[0];
-                    k.at<double>(0, 1) = cameraInfo->k[1];
-                    k.at<double>(0, 2) = cameraInfo->k[2];
-                    k.at<double>(1, 0) = cameraInfo->k[3];
-                    k.at<double>(1, 1) = cameraInfo->k[4];
-                    k.at<double>(1, 2) = cameraInfo->k[5];
-                    k.at<double>(2, 0) = cameraInfo->k[6];
-                    k.at<double>(2, 1) = cameraInfo->k[7];
-                    k.at<double>(2, 2) = cameraInfo->k[8];
-                    cv::solvePnP(corners, detectionCorners, k, d, rvec, tvec);
-                    cv::Mat rot(3, 3, CV_64FC1);
-                    cv::Rodrigues(rvec, rot);
-                    auto quaternion = fromCV(rot);
-                    tf2::Matrix3x3 quat(quaternion);
-                    tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
-                    cameraToTagEstimates.push_back(tf2::Transform(quaternion, translation));
-                    double roll, pitch, yaw;
-                    quat.getRPY(roll, pitch, yaw);
-                    RCLCPP_INFO(get_logger(), "%d: [%f, %f, %f]", detectionMessage.id, translation.x(), translation.y(), translation.z());
-                    RCLCPP_INFO(get_logger(), "%f, %f", detectionMessage.decision_margin, yaw / M_PI * 180);
+                    cameraToTagEstimates.push_back(singleTagPnP(detection, cameraInfo));
                 }
             }
             if (!buffer->canTransform(baseFrame, image->header.frame_id, tf2::TimePointZero))
@@ -208,39 +257,8 @@ namespace nfr
             tf2::fromMsg(baseToCamera.transform, baseToCameraTransform);
             if (zarray_size(detections) > 1 && useMultiTagPNP)
             {
-                std::vector<cv::Point3d> cornerTransforms;
-                std::vector<cv::Point2d> detectionCorners;
-                for (size_t i = 0; i < zarray_size(detections); i++)
-                {
-                    for (size_t j = 0; j < 4; j++)
-                    {
-                        cornerTransforms.push_back(tagCorners[msg.detections[i].id][j]);
-                        detectionCorners.push_back(cv::Point2d(msg.detections[i].corners[j].x, msg.detections[i].corners[j].y));
-                    }
-                }
-                cv::Mat d(5, 1, CV_64FC1);
-                cv::Mat k(3, 3, CV_64FC1);
-                d.at<double>(0, 0) = cameraInfo->d[0];
-                d.at<double>(1, 0) = cameraInfo->d[1];
-                d.at<double>(2, 0) = cameraInfo->d[2];
-                d.at<double>(3, 0) = cameraInfo->d[3];
-                d.at<double>(4, 0) = cameraInfo->d[4];
-                k.at<double>(0, 0) = cameraInfo->k[0];
-                k.at<double>(1, 0) = cameraInfo->k[1];
-                k.at<double>(2, 0) = cameraInfo->k[2];
-                k.at<double>(0, 1) = cameraInfo->k[3];
-                k.at<double>(1, 1) = cameraInfo->k[4];
-                k.at<double>(2, 1) = cameraInfo->k[5];
-                k.at<double>(0, 2) = cameraInfo->k[6];
-                k.at<double>(1, 2) = cameraInfo->k[7];
-                k.at<double>(2, 2) = cameraInfo->k[8];
-                cv::Mat rvec(3, 1, CV_64FC1), tvec(3, 1, CV_64FC1);
-                cv::solvePnP(cornerTransforms, detectionCorners, k, d, rvec, tvec, false, cv::SOLVEPNP_SQPNP);
-                cv::Mat rot(3, 3, CV_64FC1);
-                cv::Rodrigues(rvec, rot);
-                tf2::Quaternion quaternion = fromCV(rot);
-                tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
-                tf2::Transform poseEstimate = tf2::Transform(quaternion, translation).inverse() * baseToCameraTransform.inverse();
+                tf2::Transform fieldToCamera = multiTagPnP(detections, cameraInfo);
+                tf2::Transform poseEstimate = fieldToCamera * baseToCameraTransform.inverse();
                 geometry_msgs::msg::PoseWithCovarianceStamped pose;
                 pose.header.stamp = image->header.stamp;
                 pose.header.frame_id = "map";
