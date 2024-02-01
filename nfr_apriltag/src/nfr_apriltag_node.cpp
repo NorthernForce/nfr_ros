@@ -21,7 +21,7 @@
 #include <Eigen/Dense>
 #include <tag36h11.h>
 #include <opencv2/calib3d.hpp>
-#include <math.h>/
+#include <math.h>
 using std::placeholders::_1;
 namespace nfr
 {

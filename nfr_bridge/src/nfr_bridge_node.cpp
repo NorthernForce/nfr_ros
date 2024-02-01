@@ -60,7 +60,7 @@ namespace nfr
         struct TargetCamera
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleArrayPublisher area, pitch, yaw, tx, ty;
+            nt::DoubleArrayPublisher area, pitch, yaw, tx, ty, depth;
             nt::IntegerArrayPublisher fiducialID, stamp;
             rclcpp::Subscription<nfr_msgs::msg::TargetList>::SharedPtr subscription;
         };
@@ -131,6 +131,7 @@ namespace nfr
                 cameras[i].yaw = cameras[i].table->GetDoubleArrayTopic("yaw").Publish();
                 cameras[i].tx = cameras[i].table->GetDoubleArrayTopic("tx").Publish();
                 cameras[i].ty = cameras[i].table->GetDoubleArrayTopic("ty").Publish();
+                cameras[i].depth = cameras[i].table->GetDoubleArrayTopic("depth").Publish();
                 cameras[i].fiducialID = cameras[i].table->GetIntegerArrayTopic("fiducial_id").Publish();
                 cameras[i].stamp = cameras[i].table->GetIntegerArrayTopic("stamp").Publish();
                 std::function<void(const nfr_msgs::msg::TargetList&)> cameraCallback =
@@ -175,7 +176,7 @@ namespace nfr
         }
         void sendDetection(const nfr_msgs::msg::TargetList& msg, int i)
         {
-            std::vector<double> area, pitch, yaw, tx, ty;
+            std::vector<double> area, pitch, yaw, tx, ty, depth;
             std::vector<long> fiducialID, stamp;
             for (size_t j = 0; j < msg.targets.size(); j++)
             {
@@ -185,6 +186,7 @@ namespace nfr
                 yaw.push_back(msg.targets[j].yaw);
                 tx.push_back(msg.targets[j].center.x);
                 ty.push_back(msg.targets[j].center.y);
+                depth.push_back(msg.targets[j].depth);
                 fiducialID.push_back(msg.targets[j].fiducial_id);
                 std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
                 stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
@@ -195,6 +197,7 @@ namespace nfr
             cameras[i].yaw.Set(yaw);
             cameras[i].tx.Set(tx);
             cameras[i].ty.Set(ty);
+            cameras[i].depth.Set(depth);
             cameras[i].fiducialID.Set(fiducialID);
             cameras[i].stamp.Set(stamp);
         }
