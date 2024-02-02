@@ -65,7 +65,7 @@ namespace nfr
             return quat * fromOpenCVRotation;
         }
     public:
-        NFRAprilTagNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_node", options.clock_type(RCL_HARD))
+        NFRAprilTagNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_node", options)
         {
             detector = apriltag_detector_create();
             distanceFactor = declare_parameter("distance_factor", 0.1);
