@@ -35,12 +35,23 @@ def generate_launch_description():
             'color_width': resolution_width,
             'enable_infra1': False,
             'enable_infra2': False,
-            'enable_depth': enable_depth
+            'enable_depth': enable_depth,
+            'depth_module.global_time_enabled': False
         }],
         remappings=[
             ('color/image_raw', 'image'),
             ('color/camera_info', 'camera_info')
         ]
+    )
+    rectify_node = ComposableNode(
+        package='image_proc',
+        plugin='image_proc::RectifyNode',
+        name='realsense_rectify',
+        namespace='',
+        parameters=[{
+            'output_width': resolution_width,
+            'output_height': resolution_height
+        }]
     )
     nfr_apriltag_node = ComposableNode(
         package='nfr_apriltag',
@@ -53,6 +64,12 @@ def generate_launch_description():
             'family': '36h11'
         }]
     )
+    nfr_depth_finder_node = ComposableNode(
+        package='nfr_depth_finder',
+        plugin='nfr::NFRDepthFinderNode',
+        name='realsense_depth_finder',
+        namespace=''
+    )
     realsense_container = ComposableNodeContainer(
         package='rclcpp_components',
         name='realsense_container',
@@ -60,7 +77,9 @@ def generate_launch_description():
         namespace='',
         composable_node_descriptions=[
             nfr_apriltag_node,
-            realsense_node
+            realsense_node,
+            nfr_depth_finder_node,
+            rectify_node
         ]
     )
     camera_node = Node(

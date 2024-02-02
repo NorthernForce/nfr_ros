@@ -180,7 +180,6 @@ namespace nfr
             std::vector<long> fiducialID, stamp;
             for (size_t j = 0; j < msg.targets.size(); j++)
             {
-                RCLCPP_INFO(get_logger(), "Processing detection");
                 area.push_back(msg.targets[j].area);
                 pitch.push_back(msg.targets[j].pitch);
                 yaw.push_back(msg.targets[j].yaw);

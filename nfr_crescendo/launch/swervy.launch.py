@@ -14,7 +14,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     [
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                        '/usb_apriltag.launch.py'
+                        '/realsense_apriltag.launch.py'
                     ]
                 ),
                 launch_arguments=[
@@ -22,8 +22,7 @@ def generate_launch_description():
                     ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-1920x1080.yaml'),
                     ('pixel_format', 'yuyv'),
                     ('resolution_width', '1920'),
-                    ('resolution_height', '1080'),
-                    ('camera_path', '/dev/video0')
+                    ('resolution_height', '1080')
                 ]
             )
         ]
