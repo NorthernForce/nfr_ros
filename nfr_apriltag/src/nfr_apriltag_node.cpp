@@ -65,7 +65,7 @@ namespace nfr
             return quat * fromOpenCVRotation;
         }
     public:
-        NFRAprilTagNode(const rclcpp::NodeOptions& options) : rclcpp::Node("nfr_apriltag_node", options)
+        NFRAprilTagNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_node", options.clock_type(RCL_HARD))
         {
             detector = apriltag_detector_create();
             distanceFactor = declare_parameter("distance_factor", 0.1);
@@ -82,7 +82,7 @@ namespace nfr
             calculateDepth = declare_parameter("calculate_depth", true);
             family = tag36h11_create(); // 36h11 is assumed. Maybe add other tags later???
             apriltag_detector_add_family(detector, family);
-            cameraSubscription = image_transport::CameraSubscriber(this, "image", std::bind(&NFRAprilTagNode::onCamera, this, std::placeholders::_1, std::placeholders::_2), "raw");
+            cameraSubscription = image_transport::CameraSubscriber(this, "image_rect", std::bind(&NFRAprilTagNode::onCamera, this, std::placeholders::_1, std::placeholders::_2), "raw");
             publisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_estimations", 10);
             targetPublisher = create_publisher<nfr_msgs::msg::TargetList>("targets", 10);
             buffer = std::make_unique<tf2_ros::Buffer>(get_clock());
@@ -151,8 +151,9 @@ namespace nfr
             target.center.x = detection->c[0];
             target.center.y = detection->c[1];
             target.fiducial_id = detection->id;
-            target.yaw = atan((target.center.x - cameraInfo->k[2]) / cameraInfo->k[0]);
-            target.pitch = atan((target.center.y - cameraInfo->k[5]) / cameraInfo->k[4]);
+            target.yaw = atan((target.center.x - cameraInfo->p[2]) / cameraInfo->p[0]);
+            target.pitch = atan((target.center.y - cameraInfo->p[6]) / cameraInfo->p[5]);
+            return target;
         }
         tf2::Transform singleTagPnP(apriltag_detection* detection, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
         {
@@ -169,15 +170,15 @@ namespace nfr
             d.at<double>(2, 0) = cameraInfo->d[2];
             d.at<double>(3, 0) = cameraInfo->d[3];
             d.at<double>(4, 0) = cameraInfo->d[4];
-            k.at<double>(0, 0) = cameraInfo->k[0];
-            k.at<double>(0, 1) = cameraInfo->k[1];
-            k.at<double>(0, 2) = cameraInfo->k[2];
-            k.at<double>(1, 0) = cameraInfo->k[3];
-            k.at<double>(1, 1) = cameraInfo->k[4];
-            k.at<double>(1, 2) = cameraInfo->k[5];
-            k.at<double>(2, 0) = cameraInfo->k[6];
-            k.at<double>(2, 1) = cameraInfo->k[7];
-            k.at<double>(2, 2) = cameraInfo->k[8];
+            k.at<double>(0, 0) = cameraInfo->p[0];
+            k.at<double>(0, 1) = cameraInfo->p[1];
+            k.at<double>(0, 2) = cameraInfo->p[2];
+            k.at<double>(1, 0) = cameraInfo->p[4];
+            k.at<double>(1, 1) = cameraInfo->p[5];
+            k.at<double>(1, 2) = cameraInfo->p[6];
+            k.at<double>(2, 0) = cameraInfo->p[8];
+            k.at<double>(2, 1) = cameraInfo->p[9];
+            k.at<double>(2, 2) = cameraInfo->p[10];
             cv::solvePnP(corners, detectionCorners, k, d, rvec, tvec);
             cv::Mat rot(3, 3, CV_64FC1);
             cv::Rodrigues(rvec, rot);
@@ -206,15 +207,15 @@ namespace nfr
             d.at<double>(2, 0) = cameraInfo->d[2];
             d.at<double>(3, 0) = cameraInfo->d[3];
             d.at<double>(4, 0) = cameraInfo->d[4];
-            k.at<double>(0, 0) = cameraInfo->k[0];
-            k.at<double>(1, 0) = cameraInfo->k[1];
-            k.at<double>(2, 0) = cameraInfo->k[2];
-            k.at<double>(0, 1) = cameraInfo->k[3];
-            k.at<double>(1, 1) = cameraInfo->k[4];
-            k.at<double>(2, 1) = cameraInfo->k[5];
-            k.at<double>(0, 2) = cameraInfo->k[6];
-            k.at<double>(1, 2) = cameraInfo->k[7];
-            k.at<double>(2, 2) = cameraInfo->k[8];
+            k.at<double>(0, 0) = cameraInfo->p[0];
+            k.at<double>(0, 1) = cameraInfo->p[1];
+            k.at<double>(0, 2) = cameraInfo->p[2];
+            k.at<double>(1, 0) = cameraInfo->p[4];
+            k.at<double>(1, 1) = cameraInfo->p[5];
+            k.at<double>(1, 2) = cameraInfo->p[6];
+            k.at<double>(2, 0) = cameraInfo->p[8];
+            k.at<double>(2, 1) = cameraInfo->p[9];
+            k.at<double>(2, 2) = cameraInfo->p[10];
             cv::Mat rvec(3, 1, CV_64FC1), tvec(3, 1, CV_64FC1);
             cv::solvePnP(cornerTransforms, detectionCorners, k, d, rvec, tvec, false, cv::SOLVEPNP_SQPNP);
             cv::Mat rot(3, 3, CV_64FC1);
@@ -298,6 +299,7 @@ namespace nfr
                 }
             }
             targetPublisher->publish(targets);
+            return;
             apriltag_detections_destroy(detections);
         }
     };

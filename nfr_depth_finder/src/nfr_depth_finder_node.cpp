@@ -14,10 +14,10 @@ namespace nfr
         std::shared_ptr<message_filters::TimeSynchronizer<nfr_msgs::msg::TargetList, sensor_msgs::msg::Image>> synchronizer{nullptr};
         rclcpp::Publisher<nfr_msgs::msg::TargetList>::SharedPtr targetPublisher;
     public:
-        NFRDepthFinderNode(const rclcpp::NodeOptions& options) : rclcpp::Node("nfr_depth_finder_node", options)
+        NFRDepthFinderNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_depth_finder_node", options.clock_type(RCL_SYSTEM_TIME))
         {
             targetSubscription = std::make_shared<message_filters::Subscriber<nfr_msgs::msg::TargetList>>(this, "targets");
-            depthSubscription = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(this, "depth/image_raw");
+            depthSubscription = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(this, "depth/image_rect_raw");
             synchronizer = std::make_shared<message_filters::TimeSynchronizer<nfr_msgs::msg::TargetList, sensor_msgs::msg::Image>>
                 (*targetSubscription, *depthSubscription, 10);
             targetPublisher = create_publisher<nfr_msgs::msg::TargetList>("targets_filtered", 10);
@@ -25,6 +25,7 @@ namespace nfr
         }
         void depthCallback(const nfr_msgs::msg::TargetList::ConstSharedPtr& targets, const sensor_msgs::msg::Image::ConstSharedPtr& depthImage)
         {
+            RCLCPP_INFO(get_logger(), "Calcualting depth of %d tags", targets->targets.size());
             nfr_msgs::msg::TargetList filteredTargets;
             for (auto target : targets->targets)
             {
