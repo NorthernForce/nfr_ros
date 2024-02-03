@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(nfr_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(message_filters REQUIRED)
+find_package(cv_bridge REQUIRED)
 
 add_library(nfr_depth_finder_node src/nfr_depth_finder_node.cpp)
 add_library(nfr_depth_finder::nfr_depth_finder_node ALIAS nfr_depth_finder_node)
@@ -20,7 +21,7 @@ target_compile_features(nfr_depth_finder_node PUBLIC c_std_99 cxx_std_17)  # Req
 target_include_directories(nfr_depth_finder_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(nfr_depth_finder_node rclcpp rclcpp_components nfr_msgs sensor_msgs message_filters)
+ament_target_dependencies(nfr_depth_finder_node rclcpp rclcpp_components nfr_msgs sensor_msgs message_filters cv_bridge)
 rclcpp_components_register_nodes(nfr_depth_finder_node "nfr::NFRDepthFinderNode")
 set(node_plugins "${node_plugins}nfr::NFRDepthFinderNode;$<TARGET_FILE:nfr_depth_finder_node>\n")
 

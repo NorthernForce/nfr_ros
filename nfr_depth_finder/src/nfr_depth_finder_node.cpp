@@ -4,6 +4,7 @@
 #include <message_filters/cache.h>
 #include <sensor_msgs/msg/image.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
+#include <cv_bridge/cv_bridge.hpp>
 namespace nfr
 {
     class NFRDepthFinderNode : public rclcpp::Node
@@ -34,7 +35,8 @@ namespace nfr
             for (auto target : targets->targets)
             {
                 nfr_msgs::msg::Target filteredTarget = target;
-                filteredTarget.depth = (double)depthImage->data[target.center.y * depthImage->width + target.center.x] / 1000;
+                auto mat = cv_bridge::toCvCopy(*depthImage, sensor_msgs::image_encodings::TYPE_16UC1);
+                filteredTarget.depth = (double)mat->image.at<uint16_t>(target.center.y, target.center.x) / 1000;
                 filteredTargets.targets.push_back(filteredTarget);
             }
             targetPublisher->publish(filteredTargets);
