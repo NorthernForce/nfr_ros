@@ -45,6 +45,7 @@ namespace nfr
         std::vector<cv::Point3d> corners;
         std::map<int, std::vector<cv::Point3d>> tagCorners;
         tf2::Quaternion toOpenCVRotation, fromOpenCVRotation;
+        int iteration;
         tf2::Vector3 fromCV(cv::Point3d point)
         {
             return tf2::Vector3(point.z, point.x, point.y);
@@ -67,6 +68,7 @@ namespace nfr
     public:
         NFRAprilTagNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_node", options)
         {
+            iteration = 0;
             detector = apriltag_detector_create();
             distanceFactor = declare_parameter("distance_factor", 0.1);
             std::string tagFamily = declare_parameter("family", "36h11");
@@ -109,7 +111,6 @@ namespace nfr
                     tf2::Vector3 tf2Point = fromCV(points[i]);
                     tf2Point = tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), tf2Point) + tagPoses[tag["ID"]].getOrigin();
                     tagCorners[tag["ID"]].emplace_back(toCV(tf2Point));
-                    RCLCPP_INFO(get_logger(), "Corner %f, %f, %f", tf2Point.x(), tf2Point.y(), tf2Point.z());
                 }
             }
             tf2::Matrix3x3 mat{0, 0, 1, -1, 0, 0, 0, -1, 0};
@@ -226,6 +227,7 @@ namespace nfr
         }
         void onCamera(const sensor_msgs::msg::Image::ConstSharedPtr& image, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
         {
+            iteration++;
             cv::Mat monoImage = cv_bridge::toCvShare(image, "mono8")->image;
             image_u8_t imageU8{monoImage.cols, monoImage.rows, monoImage.cols, monoImage.data};
             mutex.lock();
@@ -233,9 +235,15 @@ namespace nfr
             mutex.unlock();
             apriltag_msgs::msg::AprilTagDetectionArray msg;
             std::vector<tf2::Transform> cameraToTagEstimates;
-            RCLCPP_INFO(get_logger(), "Detected %d tags", zarray_size(detections));
+            if (iteration % 100 == 0)
+            {
+                RCLCPP_INFO(get_logger(), "Detected %d tags", zarray_size(detections));
+            }
             removeBadDetections(detections);
-            RCLCPP_INFO(get_logger(), "Detected %d tags after removing bad tags", zarray_size(detections));
+            if (iteration % 100 == 0)
+            {
+                RCLCPP_INFO(get_logger(), "Detected %d tags after removing bad tags", zarray_size(detections));
+            }
             nfr_msgs::msg::TargetList targets;
             for (size_t i = 0; i < zarray_size(detections); i++)
             {
@@ -276,8 +284,11 @@ namespace nfr
                     0, 0, 0, 0, 0, distanceFactor * distance
                 };
                 pose.pose.pose.orientation = tf2::toMsg(poseEstimate.getRotation());
-                RCLCPP_INFO(get_logger(), "Estimated pose to be [%f, %f, %f]", poseEstimate.getOrigin().getX(), poseEstimate.getOrigin().getY(),
-                    poseEstimate.getOrigin().getZ());
+                if (iteration % 100 == 0)
+                {
+                    RCLCPP_INFO(get_logger(), "Estimated pose to be [%f, %f, %f]", poseEstimate.getOrigin().getX(), poseEstimate.getOrigin().getY(),
+                        poseEstimate.getOrigin().getZ());
+                }
                 publisher->publish(pose);
             }
             else
@@ -293,8 +304,20 @@ namespace nfr
                     pose.pose.pose.position.y = poseEstimate.getOrigin().getY();
                     pose.pose.pose.position.z = poseEstimate.getOrigin().getZ();
                     pose.pose.pose.orientation = tf2::toMsg(poseEstimate.getRotation());
-                    RCLCPP_INFO(get_logger(), "Estimated pose to be [%f, %f, %f]", poseEstimate.getOrigin().getX(), poseEstimate.getOrigin().getY(),
-                        poseEstimate.getOrigin().getZ());
+                    double distance = std::sqrt(std::pow(poseEstimate.getOrigin().getX(), 2) + std::pow(poseEstimate.getOrigin().getY(), 2));
+                    pose.pose.covariance = {
+                        distanceFactor * distance, 0, 0, 0, 0, 0,
+                        0, distanceFactor * distance, 0, 0, 0, 0,
+                        0, 0, 1e3, 0, 0, 0,
+                        0, 0, 0, 1e3, 0, 0,
+                        0, 0, 0, 0, 1e3, 0,
+                        0, 0, 0, 0, 0, distanceFactor * distance
+                    };
+                    if (iteration % 100 == 0)
+                    {
+                        RCLCPP_INFO(get_logger(), "Estimated pose to be [%f, %f, %f]", poseEstimate.getOrigin().getX(), poseEstimate.getOrigin().getY(),
+                            poseEstimate.getOrigin().getZ());
+                    }
                     publisher->publish(pose);
                 }
             }

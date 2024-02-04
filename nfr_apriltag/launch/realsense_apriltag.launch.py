@@ -2,7 +2,7 @@ from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch.conditions import IfCondition
 from launch import LaunchDescription
 def generate_launch_description():
@@ -23,7 +23,7 @@ def generate_launch_description():
     enable_depth_argument = DeclareLaunchArgument('enable_depth', default_value='True')
     camera_name_argument = DeclareLaunchArgument('camera_name', default_value='default')
     camera_port_argument = DeclareLaunchArgument('camera_port', default_value='1181')
-    fps_argument = DeclareLaunchArgument('fps', default_value='30')
+    fps_argument = DeclareLaunchArgument('fps', default_value='8')
     launch_camera_server_argument = DeclareLaunchArgument('launch_camera_server', default_value='False')
     realsense_node = ComposableNode(
         package='realsense2_camera',
@@ -31,8 +31,7 @@ def generate_launch_description():
         name='realsense_camera',
         namespace='',
         parameters=[{
-            'color_height': resolution_height,
-            'color_width': resolution_width,
+            'rgb_camera.profile': PythonExpression(['"', resolution_width, 'x', resolution_height, 'x', fps, '"']),
             'enable_infra1': False,
             'enable_infra2': False,
             'enable_depth': enable_depth,
@@ -68,7 +67,12 @@ def generate_launch_description():
         package='nfr_depth_finder',
         plugin='nfr::NFRDepthFinderNode',
         name='realsense_depth_finder',
-        namespace=''
+        namespace='',
+        parameters=[{
+            'color_height': resolution_height,
+            'color_width': resolution_width
+        }],
+        condition=IfCondition(enable_depth)
     )
     realsense_container = ComposableNodeContainer(
         package='rclcpp_components',
