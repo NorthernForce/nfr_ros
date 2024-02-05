@@ -15,7 +15,7 @@ def generate_launch_description():
     camera_port = LaunchConfiguration('camera_port')
     fps = LaunchConfiguration('fps')
     launch_camera_server = LaunchConfiguration('launch_camera_server')
-    tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.24')
+    tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.165')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1920')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='1080')
     field_path_argument = DeclareLaunchArgument('field_path', default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'),
@@ -31,26 +31,14 @@ def generate_launch_description():
         name='realsense_camera',
         namespace='',
         parameters=[{
-            'rgb_camera.profile': PythonExpression(['"', resolution_width, 'x', resolution_height, 'x', fps, '"']),
-            'enable_infra1': False,
-            'enable_infra2': False,
-            'enable_depth': enable_depth,
-            'depth_module.global_time_enabled': False
+            'rgb_camera.profile': PythonExpression(['"', resolution_width, ',', resolution_height, ',', fps, '"']),
+            'align_depth.enable': enable_depth
         }],
         remappings=[
-            ('color/image_raw', 'image'),
-            ('color/camera_info', 'camera_info')
+            ('realsense_camera/color/image_raw', 'image'),
+            ('realsense_camera/color/camera_info', 'camera_info'),
+            ('realsense_camera/aligned_depth_to_color/image_raw', 'depth_raw')
         ]
-    )
-    rectify_node = ComposableNode(
-        package='image_proc',
-        plugin='image_proc::RectifyNode',
-        name='realsense_rectify',
-        namespace='',
-        parameters=[{
-            'output_width': resolution_width,
-            'output_height': resolution_height
-        }]
     )
     nfr_apriltag_node = ComposableNode(
         package='nfr_apriltag',
@@ -60,7 +48,8 @@ def generate_launch_description():
         parameters=[{
             'field_path': field_path,
             'size': tag_size,
-            'family': '36h11'
+            'family': '36h11',
+            'use_multi_tag_pnp': False
         }]
     )
     nfr_depth_finder_node = ComposableNode(
@@ -82,8 +71,7 @@ def generate_launch_description():
         composable_node_descriptions=[
             nfr_apriltag_node,
             realsense_node,
-            nfr_depth_finder_node,
-            rectify_node
+            nfr_depth_finder_node
         ]
     )
     camera_node = Node(

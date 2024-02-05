@@ -23,7 +23,8 @@ def generate_launch_description():
                     ('resolution_width', '1280'),
                     ('resolution_height', '720'),
                     ('fps', '15'),
-                    ('launch_camera_server', 'True')
+                    ('launch_camera_server', 'True'),
+                    ('enable_depth', 'True')
                 ]
             )
         ]
@@ -56,7 +57,8 @@ def generate_launch_description():
             'target_cameras': ['apriltag_camera']
         }],
         remappings=[
-            ('apriltag_camera/targets', 'apriltag_camera/targets_filtered')]
+            ('apriltag_camera/targets', 'apriltag_camera/targets')
+        ]
     )
     local_localization_node = Node(
         package='fuse_optimizers',

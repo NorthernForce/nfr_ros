@@ -8,6 +8,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/buffer.h>
 #include <networktables/NetworkTableEntry.h>
 #include <networktables/NetworkTableInstance.h>
@@ -81,7 +82,7 @@ namespace nfr
         struct TargetCamera
         {
             std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleArrayPublisher area, pitch, yaw, tx, ty, depth;
+            nt::DoubleArrayPublisher area, pitch, yaw, tx, ty, depth, distance;
             nt::IntegerArrayPublisher fiducialID, stamp;
             rclcpp::Subscription<nfr_msgs::msg::TargetList>::SharedPtr subscription;
         };
@@ -173,6 +174,7 @@ namespace nfr
                 cameras[i].tx = cameras[i].table->GetDoubleArrayTopic("tx").Publish();
                 cameras[i].ty = cameras[i].table->GetDoubleArrayTopic("ty").Publish();
                 cameras[i].depth = cameras[i].table->GetDoubleArrayTopic("depth").Publish();
+                cameras[i].distance = cameras[i].table->GetDoubleArrayTopic("distance").Publish();
                 cameras[i].fiducialID = cameras[i].table->GetIntegerArrayTopic("fiducial_id").Publish();
                 cameras[i].stamp = cameras[i].table->GetIntegerArrayTopic("stamp").Publish();
                 std::function<void(const nfr_msgs::msg::TargetList&)> cameraCallback =
@@ -219,7 +221,7 @@ namespace nfr
         }
         void sendDetection(const nfr_msgs::msg::TargetList& msg, int i)
         {
-            std::vector<double> area, pitch, yaw, tx, ty, depth;
+            std::vector<double> area, pitch, yaw, tx, ty, depth, distance;
             std::vector<long> fiducialID, stamp;
             for (size_t j = 0; j < msg.targets.size(); j++)
             {
@@ -229,6 +231,7 @@ namespace nfr
                 tx.push_back(msg.targets[j].center.x);
                 ty.push_back(msg.targets[j].center.y);
                 depth.push_back(msg.targets[j].depth);
+                distance.push_back(msg.targets[j].distance);
                 fiducialID.push_back(msg.targets[j].fiducial_id);
                 std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
                 stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
@@ -240,6 +243,7 @@ namespace nfr
             cameras[i].tx.Set(tx);
             cameras[i].ty.Set(ty);
             cameras[i].depth.Set(depth);
+            cameras[i].distance.Set(distance);
             cameras[i].fiducialID.Set(fiducialID);
             cameras[i].stamp.Set(stamp);
         }

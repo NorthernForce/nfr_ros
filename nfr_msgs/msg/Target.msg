@@ -5,3 +5,4 @@ float64 yaw
 float64 area
 int64 fiducial_id
 float64 depth
+float64 distance
