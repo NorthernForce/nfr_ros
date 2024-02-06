@@ -52,7 +52,7 @@ local_localization_node:
       map_frame_id: 'map'
       world_frame_id: 'odom'
       publish_tf: true
-      publish_frequency: 10.0
+      publish_frequency: 50.0
 
 global_localization_node:
   ros__parameters:
@@ -101,7 +101,7 @@ global_localization_node:
       angular_velocity_dimensions: ['yaw']
 
     pose_sensor:
-      topic: 'usb_cam1/pose_estimations'
+      topic: 'apriltag_camera/pose_estimations'
       twist_target_frame: 'base_link'
       position_dimensions: ['x', 'y']
       orientation_dimensions: ['yaw']
@@ -117,4 +117,4 @@ global_localization_node:
       map_frame_id: 'map'
       world_frame_id: 'map'
       publish_tf: true
-      publish_frequency: 10.0
+      publish_frequency: 50.0

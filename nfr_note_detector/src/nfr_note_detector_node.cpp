@@ -41,11 +41,11 @@ namespace nfr
             if (contours.size())
             {
                 nfr_msgs::msg::TargetList targets;
+                targets.header = image->header;
                 for (size_t i = 0; i < boundRect.size(); i++)
                 {
                     targets.targets.push_back(nfr_msgs::msg::Target());
                     auto& target = targets.targets[i];
-                    target.header = image->header;
                     target.area = boundRect[i].area();
                     target.center.x = boundRect[i].x + boundRect[i].width / 2;
                     target.center.x = boundRect[i].y + boundRect[i].height / 2;

@@ -9,21 +9,22 @@ def generate_launch_description():
         robot_desc = f.read()
     apriltag_launch = GroupAction(
         actions=[
-            PushRosNamespace('usb_cam1'),
+            PushRosNamespace('apriltag_camera'),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     [
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                        '/usb_apriltag.launch.py'
+                        '/realsense_apriltag.launch.py'
                     ]
                 ),
                 launch_arguments=[
                     ('field_path', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'field.json')),
-                    ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
                     ('pixel_format', 'yuyv'),
-                    ('resolution_width', '640'),
-                    ('resolution_height', '480'),
-                    ('camera_path', '/dev/video0')
+                    ('resolution_width', '1280'),
+                    ('resolution_height', '720'),
+                    ('fps', '15'),
+                    ('launch_camera_server', 'True'),
+                    ('enable_depth', 'True')
                 ]
             )
         ]
@@ -48,6 +49,14 @@ def generate_launch_description():
             ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
+    bridge_node = Node(
+        package='nfr_bridge',
+        executable='nfr_bridge_node',
+        name='nfr_bridge_node',
+        parameters=[{
+            'target_cameras': ['apriltag_camera']
+        }]
+    )
     local_localization_node = Node(
         package='fuse_optimizers',
         executable='fixed_lag_smoother_node',
@@ -64,52 +73,11 @@ def generate_launch_description():
             os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'fuse.yaml')
         ]
     )
-    bridge_node = Node(
-        package='nfr_bridge',
-        executable='nfr_bridge_node',
-        name='nfr_bridge_node',
-        parameters=[{
-            'target_cameras': ['usb_cam1', 'usb_cam2']
-        }]
-    )
-    camera_node = GroupAction(
-        actions = [
-            PushRosNamespace('usb_cam2'),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([
-                    os.path.join(get_package_share_directory('nfr_camera'), 'launch'),
-                    '/usb_cam.launch.py'
-                ]),
-                launch_arguments=[
-                    ('camera_path', '/dev/video2'),
-                    ('camera_name', 'usb_cam2'),
-                    ('camera_port', '1182'),
-                    ('resolution_width', '640'),
-                    ('resolution_height', '480'),
-                    ('camera_info_url', 'package://nfr_crescendo/config/05a3_9230-640x480.yaml'),
-                    ('pixel_format', 'yuyv')
-                ]
-            )
-        ]
-    )
-    note_detection_node = Node(
-        package='nfr_note_detector',
-        executable='nfr_note_detector_node',
-        name='nfr_note_detector_node',
-        namespace='usb_cam2',
-        parameters=[{
-            'camera_path': 'image',
-            'camera_name': 'USBCam',
-            'camera_port': 1183
-        }]
-    )
     return LaunchDescription([
         robot_state_publisher,
         apriltag_launch,
         navigation_launch,
-        local_localization_node,
-        global_localization_node,
         bridge_node,
-        camera_node,
-        note_detection_node
+        local_localization_node,
+        global_localization_node
     ])
