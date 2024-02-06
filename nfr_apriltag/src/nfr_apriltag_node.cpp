@@ -70,7 +70,7 @@ namespace nfr
             );
             tf2::Quaternion quat;
             quaternion.getRotation(quat);
-            return tf2::Quaternion(quat.z(), -quat.x(), -quat.y(), quat.w());
+            return tf2::Quaternion(quat.z(), quat.x(), quat.y(), quat.w());
         }
         std::string cameraFrame;
     public:

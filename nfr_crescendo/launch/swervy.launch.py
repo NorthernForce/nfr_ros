@@ -57,7 +57,7 @@ def generate_launch_description():
             'target_cameras': ['apriltag_camera']
         }],
         remappings=[
-            ('apriltag_camera/targets', 'apriltag_camera/targets')
+            ('apriltag_camera/targets', 'apriltag_camera/targets_filtered')
         ]
     )
     local_localization_node = Node(
