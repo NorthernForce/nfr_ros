@@ -55,10 +55,7 @@ def generate_launch_description():
         name='nfr_bridge_node',
         parameters=[{
             'target_cameras': ['apriltag_camera']
-        }],
-        remappings=[
-            ('apriltag_camera/targets', 'apriltag_camera/targets_filtered')
-        ]
+        }]
     )
     local_localization_node = Node(
         package='fuse_optimizers',

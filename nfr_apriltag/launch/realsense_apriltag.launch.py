@@ -43,24 +43,29 @@ def generate_launch_description():
     nfr_apriltag_node = ComposableNode(
         package='nfr_apriltag',
         plugin='nfr::NFRAprilTagNode',
-        name='usb_localization',
+        name='realsense_apriltag',
+        namespace='',
+        parameters=[{
+            'size': tag_size,
+            'family': '36h11'
+        }]
+    )
+    nfr_apriltag_localization_node = ComposableNode(
+        package='nfr_apriltag_localization',
+        plugin='nfr::NFRAprilTagLocalizationNode',
+        name='realsense_apriltag_localization',
         namespace='',
         parameters=[{
             'field_path': field_path,
             'size': tag_size,
-            'family': '36h11',
             'use_multi_tag_pnp': False
         }]
     )
-    nfr_depth_finder_node = ComposableNode(
-        package='nfr_depth_finder',
-        plugin='nfr::NFRDepthFinderNode',
-        name='realsense_depth_finder',
+    nfr_target_finder_node = ComposableNode(
+        package='nfr_target_finder',
+        plugin='nfr::NFRTargetFinderNode',
+        name='realsense_depth_finder_node',
         namespace='',
-        parameters=[{
-            'color_height': resolution_height,
-            'color_width': resolution_width
-        }],
         condition=IfCondition(enable_depth)
     )
     realsense_container = ComposableNodeContainer(
@@ -71,7 +76,8 @@ def generate_launch_description():
         composable_node_descriptions=[
             nfr_apriltag_node,
             realsense_node,
-            nfr_depth_finder_node
+            nfr_apriltag_localization_node,
+            nfr_target_finder_node
         ]
     )
     camera_node = Node(

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(nfr_depth_finder)
+project(nfr_target_finder)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -8,33 +8,33 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_ros REQUIRED)
-find_package(rclcpp_components REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(nfr_msgs REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(message_filters REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(message_filters REQUIRED)
+find_package(nfr_msgs REQUIRED)
+find_package(apriltag_msgs)
+# uncomment the following section in order to fill in
+# further dependencies manually.
+# find_package(<dependency> REQUIRED)
 
-add_library(nfr_depth_finder_node src/nfr_depth_finder_node.cpp)
-add_library(nfr_depth_finder::nfr_depth_finder_node ALIAS nfr_depth_finder_node)
-target_compile_features(nfr_depth_finder_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-target_include_directories(nfr_depth_finder_node PUBLIC
+add_library(nfr_target_finder_node src/nfr_target_finder_node.cpp)
+add_library(nfr_target_finder::nfr_target_finder_node ALIAS nfr_target_finder_node)
+ament_target_dependencies(nfr_target_finder_node rclcpp rclcpp_components nfr_msgs apriltag_msgs sensor_msgs cv_bridge message_filters)
+target_compile_features(nfr_target_finder_node PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_include_directories(nfr_target_finder_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(nfr_depth_finder_node rclcpp rclcpp_components nfr_msgs sensor_msgs message_filters cv_bridge)
-rclcpp_components_register_nodes(nfr_depth_finder_node "nfr::NFRDepthFinderNode")
-set(node_plugins "${node_plugins}nfr::NFRDepthFinderNode;$<TARGET_FILE:nfr_depth_finder_node>\n")
+rclcpp_components_register_nodes(nfr_target_finder_node "nfr::NFRTargetFinderNode")
+set(node_plugins "${node_plugins}nfr::NFRTargetFinderNode;$<TARGET_FILE:nfr_target_finder_node>\n")
 
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
-target_compile_definitions(nfr_depth_finder_node PRIVATE "NFR_DEPTH_FINDER_BUILDING_LIBRARY")
+target_compile_definitions(nfr_target_finder_node PRIVATE "NFR_TARGET_FINDER_BUILDING_LIBRARY")
 
 install(
-  DIRECTORY include/
-  DESTINATION include
-)
-install(
-  TARGETS nfr_depth_finder_node
+  TARGETS nfr_target_finder_node
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
@@ -57,7 +57,7 @@ ament_export_include_directories(
   include
 )
 ament_export_libraries(
-  nfr_depth_finder_node
+  nfr_target_finder_node
 )
 ament_export_targets(
   export_${PROJECT_NAME}
