@@ -17,8 +17,12 @@
 #include <networktables/IntegerTopic.h>
 #include <networktables/BooleanTopic.h>
 #include <networktables/DoubleArrayTopic.h>
+#include <networktables/StructTopic.h>
+#include <networktables/StructArrayTopic.h>
 #include <networktables/IntegerArrayTopic.h>
 #include <nfr_msgs/msg/target_list.hpp>
+#include <frc/geometry/Pose2d.h>
+#include <frc/geometry/Twist2d.h>
 #include <fuse_msgs/srv/set_pose.hpp>
 double getYawFromQuaternion(const geometry_msgs::msg::Quaternion& quat)
 {
@@ -30,6 +34,45 @@ double getYawFromQuaternion(const geometry_msgs::msg::Quaternion& quat)
     return yaw;
 }
 using namespace std::chrono_literals;
+template<>
+struct wpi::Struct<nfr_msgs::msg::Target>
+{
+    static constexpr std::string_view GetTypeString()
+    {
+        return "struct:TargetDetection";
+    }
+    static constexpr size_t GetSize()
+    {
+        return sizeof(double) * 6 + sizeof(long);
+    }
+    static constexpr std::string_view GetSchema() {
+        return "double area; double tx; double ty; double pitch; double yaw; double depth; long fiducialID";
+    }
+    static nfr_msgs::msg::Target Unpack(std::span<const uint8_t> data)
+    {
+        nfr_msgs::msg::Target target;
+        target.area = wpi::UnpackStruct<double, 0>(data);
+        target.center.x = (int)wpi::UnpackStruct<double, sizeof(double)>(data);
+        target.center.y = (int)wpi::UnpackStruct<double, sizeof(double) * 2>(data);
+        target.pitch = wpi::UnpackStruct<double, sizeof(double) * 3>(data);
+        target.yaw = wpi::UnpackStruct<double, sizeof(double) * 4>(data);
+        target.depth = wpi::UnpackStruct<double, sizeof(double) * 5>(data);
+        target.fiducial_id = wpi::UnpackStruct<long, sizeof(double) * 6>(data);
+    }
+    static void Pack(std::span<uint8_t> data, const nfr_msgs::msg::Target& value)
+    {
+        wpi::PackStruct<0>(data, value.area);
+        wpi::PackStruct<sizeof(double)>(data, (double)value.center.x);
+        wpi::PackStruct<sizeof(double) * 2>(data, (double)value.center.x);
+        wpi::PackStruct<sizeof(double) * 3>(data, value.pitch);
+        wpi::PackStruct<sizeof(double) * 4>(data, value.yaw);
+        wpi::PackStruct<sizeof(double) * 5>(data, value.depth);
+        wpi::PackStruct<sizeof(double) * 6>(data, value.fiducial_id);
+    }
+    static void ForEachNested(std::invocable<std::string_view, std::string_view> auto fn)
+    {
+    }
+};
 namespace nfr
 {
     class NFRBridgeNode : public rclcpp::Node
@@ -37,61 +80,40 @@ namespace nfr
     private:
         nt::NetworkTableInstance instance;
         std::shared_ptr<nt::NetworkTable> table;
+        nt::StructSubscriber<frc::Pose2d> poseSubscriber;
+        nt::StructSubscriber<frc::Twist2d> odomSubscriber;
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher;
         struct
         {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber x, y, theta, deltaX, deltaY, deltaTheta;
-            nt::IntegerSubscriber stamp;
-            rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher;
-        } odometry;
-        struct
-        {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber x, y, theta;
-            nt::IntegerSubscriber stamp;
+            nt::StructSubscriber<frc::Pose2d> subscriber;
             nt::BooleanEntry cancel;
             rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr client;
             std::shared_future<std::shared_ptr<rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>>> future;
         } targetPose;
         struct
         {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoublePublisher x, y, theta;
+            nt::StructPublisher<frc::Twist2d> publisher;
             rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subscription;
         } cmdVel;
         struct
         {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleSubscriber x, y, theta;
-            nt::IntegerSubscriber stamp;
+            nt::StructSubscriber<frc::Pose2d> subscriber;
             rclcpp::Client<fuse_msgs::srv::SetPose>::SharedPtr publisher;
         } globalSetPose;
-        // struct
-        // {
-        //     std::shared_ptr<nt::NetworkTable> table;
-        //     nt::DoubleSubscriber x, y, theta;
-        //     nt::IntegerSubscriber stamp;
-        // } pose;
         struct
         {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoublePublisher x, y, theta;
-            nt::IntegerPublisher stamp;
+            nt::StructPublisher<frc::Pose2d> publisher;
             rclcpp::TimerBase::SharedPtr timer;
         } pose;
         struct TargetCamera
         {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoubleArrayPublisher area, pitch, yaw, tx, ty, depth;
-            nt::IntegerArrayPublisher fiducialID, stamp;
+            nt::StructArrayPublisher<nfr_msgs::msg::Target> publisher;
             rclcpp::Subscription<nfr_msgs::msg::TargetList>::SharedPtr subscription;
         };
         std::vector<TargetCamera> cameras;
         struct PoseSupplier
         {
-            std::shared_ptr<nt::NetworkTable> table;
-            nt::DoublePublisher x, y, theta;
-            nt::IntegerPublisher stamp;
+            nt::StructPublisher<frc::Pose2d> publisher;
             rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr subscription;
         };
         std::vector<PoseSupplier> poseSuppliers;
@@ -106,76 +128,38 @@ namespace nfr
             table = instance.GetTable(tableName);
             instance.SetServerTeam(declare_parameter("team_number", 172));
             {
-                odometry.table = table->GetSubTable("odometry");
-                odometry.deltaX = odometry.table->GetDoubleTopic("vx").Subscribe(0.0);
-                odometry.deltaY = odometry.table->GetDoubleTopic("vy").Subscribe(0.0);
-                odometry.deltaTheta = odometry.table->GetDoubleTopic("vtheta").Subscribe(0.0);
-                odometry.x = odometry.table->GetDoubleTopic("x").Subscribe(0.0);
-                odometry.y = odometry.table->GetDoubleTopic("y").Subscribe(0.0);
-                odometry.theta = odometry.table->GetDoubleTopic("theta").Subscribe(0.0);
-                odometry.stamp = odometry.table->GetIntegerTopic("stamp").Subscribe(0);
-                odometry.publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-                instance.AddListener(odometry.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
+                odomSubscriber = table->GetStructTopic<frc::Twist2d>("odometry").Subscribe(frc::Twist2d());
+                odomPublisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+                instance.AddListener(odomSubscriber, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
             }
             {
-                targetPose.table = table->GetSubTable("target_pose");
-                targetPose.x = targetPose.table->GetDoubleTopic("x").Subscribe(0.0);
-                targetPose.y = targetPose.table->GetDoubleTopic("y").Subscribe(0.0);
-                targetPose.theta = targetPose.table->GetDoubleTopic("theta").Subscribe(0.0);
-                targetPose.stamp = targetPose.table->GetIntegerTopic("stamp").Subscribe(0);
-                targetPose.cancel = targetPose.table->GetBooleanTopic("cancel").GetEntry(false);
+                targetPose.subscriber = table->GetStructTopic<frc::Pose2d>("target_pose").Subscribe(frc::Pose2d());
+                targetPose.cancel = table->GetBooleanTopic("cancel").GetEntry(false);
                 targetPose.client = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "navigate_to_pose");
-                instance.AddListener(targetPose.stamp, nt::EventFlags::kValueAll,
+                instance.AddListener(targetPose.subscriber, nt::EventFlags::kValueAll,
                     std::bind(&NFRBridgeNode::recieveTargetPose, this, std::placeholders::_1));
                 instance.AddListener(targetPose.cancel, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveCancel, this, std::placeholders::_1));
             }
             {
-                cmdVel.table = table->GetSubTable("cmd_vel");
-                cmdVel.x = cmdVel.table->GetDoubleTopic("x").Publish();
-                cmdVel.y = cmdVel.table->GetDoubleTopic("y").Publish();
-                cmdVel.theta = cmdVel.table->GetDoubleTopic("theta").Publish();
+                cmdVel.publisher = table->GetStructTopic<frc::Twist2d>("cmd_vel").Publish();
                 cmdVel.subscription = create_subscription<geometry_msgs::msg::Twist>("cmd_vel", 10,
                     std::bind(&NFRBridgeNode::cmdVelCallback, this, std::placeholders::_1));
             }
-            // {
-            //     pose.table = table->GetSubTable("pose");
-            //     pose.x = pose.table->GetDoubleTopic("x").Subscribe(0.0);
-            //     pose.y = pose.table->GetDoubleTopic("y").Subscribe(0.0);
-            //     pose.theta = pose.table->GetDoubleTopic("theta").Subscribe(0.0);
-            //     pose.stamp = pose.table->GetIntegerTopic("stamp").Subscribe(0);
-            //     instance.AddListener(pose.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receivePose, this, std::placeholders::_1));
-            // }
             {
-                globalSetPose.table = table->GetSubTable("global_set_pose");
-                globalSetPose.x = globalSetPose.table->GetDoubleTopic("x").Subscribe(0.0);
-                globalSetPose.y = globalSetPose.table->GetDoubleTopic("y").Subscribe(0.0);
-                globalSetPose.theta = globalSetPose.table->GetDoubleTopic("theta").Subscribe(0.0);
-                globalSetPose.stamp = globalSetPose.table->GetIntegerTopic("stamp").Subscribe(0);
+                globalSetPose.subscriber = table->GetStructTopic<frc::Pose2d>("global_set_pose").Subscribe(frc::Pose2d());
                 globalSetPose.publisher = create_client<fuse_msgs::srv::SetPose>("/global_localization_node/set_pose", 10);
-                instance.AddListener(globalSetPose.stamp, nt::EventFlags::kValueAll,
+                instance.AddListener(globalSetPose.subscriber, nt::EventFlags::kValueAll,
                     std::bind(&NFRBridgeNode::recieveGlobalSetPose, this, std::placeholders::_1));
             }
             {
-                pose.table = table->GetSubTable("pose");
-                pose.x = pose.table->GetDoubleTopic("x").Publish();
-                pose.y = pose.table->GetDoubleTopic("y").Publish();
-                pose.theta = pose.table->GetDoubleTopic("theta").Publish();
-                pose.stamp = pose.table->GetIntegerTopic("stamp").Publish();
+                pose.publisher = table->GetStructTopic<frc::Pose2d>("pose").Publish();
                 pose.timer = create_wall_timer(20ms, std::bind(&NFRBridgeNode::publishPose, this));
             }
             auto cameraNames = declare_parameter("target_cameras", std::vector<std::string>());
             for (size_t i = 0; i < cameraNames.size(); i++)
             {
                 cameras.push_back(TargetCamera());
-                cameras[i].table = table->GetSubTable(cameraNames[i]);
-                cameras[i].area = cameras[i].table->GetDoubleArrayTopic("area").Publish();
-                cameras[i].pitch = cameras[i].table->GetDoubleArrayTopic("pitch").Publish();
-                cameras[i].yaw = cameras[i].table->GetDoubleArrayTopic("yaw").Publish();
-                cameras[i].tx = cameras[i].table->GetDoubleArrayTopic("tx").Publish();
-                cameras[i].ty = cameras[i].table->GetDoubleArrayTopic("ty").Publish();
-                cameras[i].depth = cameras[i].table->GetDoubleArrayTopic("depth").Publish();
-                cameras[i].fiducialID = cameras[i].table->GetIntegerArrayTopic("fiducial_id").Publish();
-                cameras[i].stamp = cameras[i].table->GetIntegerArrayTopic("stamp").Publish();
+                cameras[i].publisher = table->GetStructArrayTopic<nfr_msgs::msg::Target>(cameraNames[i]).Publish();
                 std::function<void(const nfr_msgs::msg::TargetList&)> cameraCallback =
                     std::bind(&NFRBridgeNode::sendDetection, this, std::placeholders::_1, i);
                 cameras[i].subscription = create_subscription<nfr_msgs::msg::TargetList>(cameraNames[i] + "/targets", 10,
@@ -185,11 +169,7 @@ namespace nfr
             for (size_t i = 0; i < poseNames.size(); i++)
             {
                 poseSuppliers.push_back(PoseSupplier());
-                poseSuppliers[i].table = table->GetSubTable("poses")->GetSubTable(poseNames[i]);
-                poseSuppliers[i].x = poseSuppliers[i].table->GetDoubleTopic("x").Publish();
-                poseSuppliers[i].y = poseSuppliers[i].table->GetDoubleTopic("y").Publish();
-                poseSuppliers[i].theta = poseSuppliers[i].table->GetDoubleTopic("theta").Publish();
-                poseSuppliers[i].stamp = poseSuppliers[i].table->GetIntegerTopic("stamp").Publish();
+                poseSuppliers[i].publisher = table->GetSubTable("poses")->GetStructTopic<frc::Pose2d>(poseNames[i]).Publish();
                 std::function<void(const geometry_msgs::msg::PoseWithCovarianceStamped&)> poseCallback =
                     std::bind(&NFRBridgeNode::sendPose, this, std::placeholders::_1, i);
                 poseSuppliers[i].subscription = create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(poseNames[i] + "/pose_estimations", 10,
@@ -211,38 +191,14 @@ namespace nfr
         void sendPose(const geometry_msgs::msg::PoseWithCovarianceStamped& msg, int i)
         {
             PoseSupplier& supplier = poseSuppliers[i];
-            supplier.x.Set(msg.pose.pose.position.x);
-            supplier.y.Set(msg.pose.pose.position.y);
-            supplier.theta.Set(getYawFromQuaternion(msg.pose.pose.orientation));
             std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
-            supplier.stamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
-                ((rclcpp::Time)msg.header.stamp).nanoseconds() + offset)).count());
+            supplier.publisher.Set(
+                frc::Pose2d((units::meter_t)msg.pose.pose.position.x, (units::meter_t)msg.pose.pose.position.y,
+                    frc::Rotation2d((units::radian_t)getYawFromQuaternion(msg.pose.pose.orientation))), rclcpp::Time(msg.header.stamp).nanoseconds());
         }
         void sendDetection(const nfr_msgs::msg::TargetList& msg, int i)
         {
-            std::vector<double> area, pitch, yaw, tx, ty, depth;
-            std::vector<long> fiducialID, stamp;
-            for (size_t j = 0; j < msg.targets.size(); j++)
-            {
-                area.push_back(msg.targets[j].area);
-                pitch.push_back(msg.targets[j].pitch);
-                yaw.push_back(msg.targets[j].yaw);
-                tx.push_back(msg.targets[j].center.x);
-                ty.push_back(msg.targets[j].center.y);
-                depth.push_back(msg.targets[j].depth);
-                fiducialID.push_back(msg.targets[j].fiducial_id);
-                std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
-                stamp.push_back(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
-                    ((rclcpp::Time)msg.header.stamp).nanoseconds() + offset)).count());
-            }
-            cameras[i].area.Set(area);
-            cameras[i].pitch.Set(pitch);
-            cameras[i].yaw.Set(yaw);
-            cameras[i].tx.Set(tx);
-            cameras[i].ty.Set(ty);
-            cameras[i].depth.Set(depth);
-            cameras[i].fiducialID.Set(fiducialID);
-            cameras[i].stamp.Set(stamp);
+            cameras[i].publisher.Set(msg.targets, rclcpp::Time(msg.header.stamp).nanoseconds());
         }
         void recieveOdometry(const nt::Event& event)
         {
@@ -251,16 +207,14 @@ namespace nfr
             {
                 return;
             }
+            auto odometry = odomSubscriber.GetAtomic();
             nav_msgs::msg::Odometry msg;
             msg.child_frame_id = "base_link";
             msg.header.frame_id = "odom";
-            std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)odometry.stamp.Get();
-            msg.header.stamp = toHostTime(timestamp);
-            msg.pose.pose.position.x = odometry.x.Get();
-            msg.pose.pose.position.y = odometry.y.Get();
-            msg.twist.twist.linear.x = odometry.deltaX.Get();
-            msg.twist.twist.linear.y = odometry.deltaY.Get();
-            msg.twist.twist.angular.z = odometry.deltaTheta.Get();
+            msg.header.stamp = rclcpp::Time(odometry.time);
+            msg.twist.twist.linear.x = (double)odometry.value.dx;
+            msg.twist.twist.linear.y = (double)odometry.value.dy;
+            msg.twist.twist.angular.z = (double)odometry.value.dtheta;
             msg.twist.covariance = {
                 0.81, 0, 0, 0, 0, 0,
                 0, 0.81, 0, 0, 0, 0,
@@ -269,37 +223,8 @@ namespace nfr
                 0, 0, 0, 0, 1e6, 0,
                 0, 0, 0, 0, 0, 0.81
             };
-            odometry.publisher->publish(msg);
-            geometry_msgs::msg::TransformStamped transform;
-            transform.transform.translation.x = odometry.x.Get();
-            transform.transform.translation.y = odometry.y.Get();
-            tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, odometry.theta.Get());
-            transform.transform.rotation = tf2::toMsg(quaternion);
-            transform.child_frame_id = "base_link";
-            transform.header.frame_id = "odom";
-            transform.header.stamp = msg.header.stamp;
-            broadcaster->sendTransform(transform);
+            odomPublisher->publish(msg);
         }
-        // void receivePose(const nt::Event& event)
-        // {
-        //     (void)event;
-        //     if (!instance.IsConnected())
-        //     {
-        //         return;
-        //     }
-        //     geometry_msgs::msg::TransformStamped transform;
-        //     transform.transform.translation.x = pose.x.Get();
-        //     transform.transform.translation.y = pose.y.Get();
-        //     tf2::Quaternion quaternion;
-        //     quaternion.setRPY(0, 0, pose.theta.Get());
-        //     transform.transform.rotation = tf2::toMsg(quaternion);
-        //     transform.child_frame_id = "base_link";
-        //     transform.header.frame_id = "map";
-        //     std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)pose.stamp.Get();
-        //     transform.header.stamp = toHostTime(timestamp);
-        //     broadcaster->sendTransform(transform);
-        // }
         void recieveGlobalSetPose(const nt::Event& event)
         {
             (void)event;
@@ -308,11 +233,11 @@ namespace nfr
                 return;
             }
             geometry_msgs::msg::PoseWithCovarianceStamped pose;
-            std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)globalSetPose.stamp.Get();
-            pose.header.stamp = toHostTime(timestamp);
+            auto global = globalSetPose.subscriber.GetAtomic();
+            pose.header.stamp = rclcpp::Time(global.time);
             pose.header.frame_id = "map";
-            pose.pose.pose.position.x = globalSetPose.x.Get();
-            pose.pose.pose.position.y = globalSetPose.y.Get();
+            pose.pose.pose.position.x = (double)global.value.X();
+            pose.pose.pose.position.y = (double)global.value.Y();
             pose.pose.covariance = {
                 1e-6, 0, 0, 0, 0, 0,
                 0, 1e-6, 0, 0, 0, 0,
@@ -322,7 +247,7 @@ namespace nfr
                 0, 0, 0, 0, 0, 1e-6
             };
             tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, globalSetPose.theta.Get());
+            quaternion.setRPY(0, 0, (double)global.value.Rotation().Radians());
             pose.pose.pose.orientation = tf2::toMsg(quaternion);
             fuse_msgs::srv::SetPose::Request request;
             request.pose = pose;
@@ -333,12 +258,9 @@ namespace nfr
             if (buffer->canTransform("map", "base_link", tf2::TimePointZero) && instance.IsConnected())
             {
                 auto transform = buffer->lookupTransform("map", "base_link", tf2::TimePointZero);
-                pose.x.Set(transform.transform.translation.x);
-                pose.y.Set(transform.transform.translation.y);
-                pose.theta.Set(getYawFromQuaternion(transform.transform.rotation));
-                std::chrono::microseconds offset = (std::chrono::microseconds)instance.GetServerTimeOffset().value_or(0);
-                pose.stamp.Set(((std::chrono::nanoseconds)((std::chrono::nanoseconds)
-                    ((rclcpp::Time)transform.header.stamp).nanoseconds() + offset)).count());
+                pose.publisher.Set(frc::Pose2d((units::meter_t)transform.transform.translation.x, (units::meter_t)transform.transform.translation.y,
+                    (units::radian_t)getYawFromQuaternion(transform.transform.rotation)),
+                    ((rclcpp::Time)transform.header.stamp).nanoseconds());
             }
         }
         void recieveTargetPose(const nt::Event& event)
@@ -350,14 +272,14 @@ namespace nfr
             }
             RCLCPP_INFO(get_logger(), "Setting target pose");
             nav2_msgs::action::NavigateToPose::Goal goal;
+            auto pose = targetPose.subscriber.GetAtomic();
             goal.behavior_tree = "";
             goal.pose.header.frame_id = "map";
-            std::chrono::nanoseconds timestamp = (std::chrono::nanoseconds)targetPose.stamp.Get();
-            goal.pose.header.stamp = toHostTime(timestamp);
-            goal.pose.pose.position.x = targetPose.x.Get();
-            goal.pose.pose.position.y = targetPose.y.Get();
+            goal.pose.header.stamp = rclcpp::Time(pose.time);
+            goal.pose.pose.position.x = (double)pose.value.X();
+            goal.pose.pose.position.y = (double)pose.value.Y();
             tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, targetPose.theta.Get());
+            quaternion.setRPY(0, 0, (double)pose.value.Rotation().Radians());
             goal.pose.pose.orientation = tf2::toMsg(quaternion);
             targetPose.future = targetPose.client->async_send_goal(goal);
         }
@@ -381,9 +303,7 @@ namespace nfr
             {
                 return;
             }
-            cmdVel.x.Set(msg.linear.x);
-            cmdVel.y.Set(msg.linear.y);
-            cmdVel.theta.Set(msg.angular.z);
+            cmdVel.publisher.Set(frc::Twist2d((units::meter_t)msg.linear.x, (units::meter_t)msg.linear.y, (units::radian_t)msg.angular.z));
         }
     };
 }

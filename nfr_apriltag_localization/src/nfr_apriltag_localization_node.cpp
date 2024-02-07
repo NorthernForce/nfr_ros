@@ -15,6 +15,27 @@
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
+Eigen::Vector3d getCentroid(const Eigen::MatrixXd& points)
+{
+    return points.colwise().mean();
+}
+void centerPoints(Eigen::MatrixXd& points, const Eigen::Vector3d& centroid)
+{
+    points.rowwise() -= centroid.transpose();
+}
+Eigen::Matrix3d computeOptimalRotation(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B)
+{
+    Eigen::MatrixXd H = B.transpose() * A;
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(H, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::Matrix3d R = svd.matrixV() * svd.matrixU().transpose();
+    return R;
+}
+Eigen::Vector3d computeTranslation(const Eigen::Vector3d& centroidA, const Eigen::Vector3d& centroidB, const Eigen::Matrix3d& R)
+{
+    return centroidB - R * centroidA;
+}
 namespace nfr
 {
     class NFRAprilTagLocalizationNode : public rclcpp::Node
