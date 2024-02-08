@@ -58,6 +58,7 @@ struct wpi::Struct<nfr_msgs::msg::Target>
         target.yaw = wpi::UnpackStruct<double, sizeof(double) * 4>(data);
         target.depth = wpi::UnpackStruct<double, sizeof(double) * 5>(data);
         target.fiducial_id = wpi::UnpackStruct<long, sizeof(double) * 6>(data);
+        return target;
     }
     static void Pack(std::span<uint8_t> data, const nfr_msgs::msg::Target& value)
     {
@@ -71,6 +72,7 @@ struct wpi::Struct<nfr_msgs::msg::Target>
     }
     static void ForEachNested(std::invocable<std::string_view, std::string_view> auto fn)
     {
+        (void)fn;
     }
 };
 namespace nfr

@@ -15,6 +15,7 @@ find_package(nav_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(wpiutil REQUIRED)
 find_package(wpinet REQUIRED)
+find_package(wpimath REQUIRED)
 find_package(ntcore REQUIRED)
 find_package(fuse_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
@@ -29,10 +30,11 @@ target_include_directories(nfr_bridge_node PUBLIC
   $<INSTALL_INTERFACE:include>
   "/usr/local/include/ntcore"
   "/usr/local/include/wpiutil"
+  "/usr/local/include/wpimath"
 )
 target_compile_features(nfr_bridge_node PUBLIC c_std_99 cxx_std_23)  # Require C99 and C++17
 ament_target_dependencies(nfr_bridge_node rclcpp rclcpp_action geometry_msgs tf2_geometry_msgs nav_msgs nav2_msgs sensor_msgs nfr_msgs fuse_msgs)
-target_link_libraries(nfr_bridge_node wpinet ntcore wpiutil)
+target_link_libraries(nfr_bridge_node wpinet ntcore wpiutil wpimath)
 install(TARGETS nfr_bridge_node
   DESTINATION lib/${PROJECT_NAME})
 
