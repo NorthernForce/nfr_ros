@@ -82,12 +82,13 @@ namespace nfr
     private:
         nt::NetworkTableInstance instance;
         std::shared_ptr<nt::NetworkTable> table;
-        nt::StructSubscriber<frc::Pose2d> poseSubscriber;
         nt::StructSubscriber<frc::Twist2d> odomSubscriber;
+        nt::IntegerSubscriber odomStamp;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher;
         struct
         {
             nt::StructSubscriber<frc::Pose2d> subscriber;
+            nt::IntegerSubscriber stamp;
             nt::BooleanEntry cancel;
             rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr client;
             std::shared_future<std::shared_ptr<rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>>> future;
@@ -100,6 +101,7 @@ namespace nfr
         struct
         {
             nt::StructSubscriber<frc::Pose2d> subscriber;
+            nt::IntegerSubscriber stamp;
             rclcpp::Client<fuse_msgs::srv::SetPose>::SharedPtr publisher;
         } globalSetPose;
         struct
@@ -132,13 +134,15 @@ namespace nfr
             {
                 odomSubscriber = table->GetStructTopic<frc::Twist2d>("odometry").Subscribe(frc::Twist2d());
                 odomPublisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-                instance.AddListener(odomSubscriber, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
+                odomStamp = table->GetIntegerTopic("odometry_stamp").Subscribe(0);
+                instance.AddListener(odomStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
             }
             {
                 targetPose.subscriber = table->GetStructTopic<frc::Pose2d>("target_pose").Subscribe(frc::Pose2d());
+                targetPose.stamp = table->GetIntegerTopic("target_pose_stamp").Subscribe(0);
                 targetPose.cancel = table->GetBooleanTopic("cancel").GetEntry(false);
                 targetPose.client = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(this, "navigate_to_pose");
-                instance.AddListener(targetPose.subscriber, nt::EventFlags::kValueAll,
+                instance.AddListener(targetPose.stamp, nt::EventFlags::kValueAll,
                     std::bind(&NFRBridgeNode::recieveTargetPose, this, std::placeholders::_1));
                 instance.AddListener(targetPose.cancel, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveCancel, this, std::placeholders::_1));
             }
@@ -149,8 +153,9 @@ namespace nfr
             }
             {
                 globalSetPose.subscriber = table->GetStructTopic<frc::Pose2d>("global_set_pose").Subscribe(frc::Pose2d());
+                globalSetPose.stamp = table->GetIntegerTopic("global_set_pose_stamp").Subscribe(0);
                 globalSetPose.publisher = create_client<fuse_msgs::srv::SetPose>("/global_localization_node/set_pose", 10);
-                instance.AddListener(globalSetPose.subscriber, nt::EventFlags::kValueAll,
+                instance.AddListener(globalSetPose.stamp, nt::EventFlags::kLogMessage,
                     std::bind(&NFRBridgeNode::recieveGlobalSetPose, this, std::placeholders::_1));
             }
             {
