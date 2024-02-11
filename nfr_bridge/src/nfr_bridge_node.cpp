@@ -218,7 +218,7 @@ namespace nfr
             nav_msgs::msg::Odometry msg;
             msg.child_frame_id = "base_link";
             msg.header.frame_id = "odom";
-            msg.header.stamp = rclcpp::Time(odometry.time);
+            msg.header.stamp = toHostTime((std::chrono::nanoseconds)odomStamp.Get());
             msg.twist.twist.linear.x = (double)odometry.value.dx;
             msg.twist.twist.linear.y = (double)odometry.value.dy;
             msg.twist.twist.angular.z = (double)odometry.value.dtheta;
