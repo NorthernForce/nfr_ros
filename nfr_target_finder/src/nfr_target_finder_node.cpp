@@ -84,3 +84,4 @@ namespace nfr
         }
     };
 }
+RCLCPP_COMPONENTS_REGISTER_NODE(nfr::NFRTargetFinderNode);
