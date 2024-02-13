@@ -268,6 +268,7 @@ namespace nfr
                 pose.publisher.Set(frc::Pose2d((units::meter_t)transform.transform.translation.x, (units::meter_t)transform.transform.translation.y,
                     (units::radian_t)getYawFromQuaternion(transform.transform.rotation)),
                     ((rclcpp::Time)transform.header.stamp).nanoseconds());
+                instance.Flush();
             }
         }
         void recieveTargetPose(const nt::Event& event)
@@ -311,6 +312,7 @@ namespace nfr
                 return;
             }
             cmdVel.publisher.Set(frc::Twist2d((units::meter_t)msg.linear.x, (units::meter_t)msg.linear.y, (units::radian_t)msg.angular.z));
+            instance.Flush();
         }
     };
 }
