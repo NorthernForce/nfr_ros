@@ -104,12 +104,6 @@ namespace nfr
             nt::IntegerSubscriber stamp;
             rclcpp::Client<fuse_msgs::srv::SetPose>::SharedPtr publisher;
         } globalSetPose;
-        // struct
-        // {
-        //     std::shared_ptr<nt::NetworkTable> table;
-        //     nt::DoubleSubscriber x, y, theta;
-        //     nt::IntegerSubscriber stamp;
-        // } pose;
         struct
         {
             nt::StructPublisher<frc::Pose2d> publisher;
@@ -156,24 +150,6 @@ namespace nfr
                 cmdVel.publisher = table->GetStructTopic<frc::Twist2d>("cmd_vel").Publish();
                 cmdVel.subscription = create_subscription<geometry_msgs::msg::Twist>("cmd_vel", 10,
                     std::bind(&NFRBridgeNode::cmdVelCallback, this, std::placeholders::_1));
-            }
-            // {
-            //     pose.table = table->GetSubTable("pose");
-            //     pose.x = pose.table->GetDoubleTopic("x").Subscribe(0.0);
-            //     pose.y = pose.table->GetDoubleTopic("y").Subscribe(0.0);
-            //     pose.theta = pose.table->GetDoubleTopic("theta").Subscribe(0.0);
-            //     pose.stamp = pose.table->GetIntegerTopic("stamp").Subscribe(0);
-            //     instance.AddListener(pose.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receivePose, this, std::placeholders::_1));
-            // }
-            {
-                globalSetPose.table = table->GetSubTable("global_set_pose");
-                globalSetPose.x = globalSetPose.table->GetDoubleTopic("x").Subscribe(0.0);
-                globalSetPose.y = globalSetPose.table->GetDoubleTopic("y").Subscribe(0.0);
-                globalSetPose.theta = globalSetPose.table->GetDoubleTopic("theta").Subscribe(0.0);
-                globalSetPose.stamp = globalSetPose.table->GetIntegerTopic("stamp").Subscribe(0);
-                globalSetPose.publisher = create_client<fuse_msgs::srv::SetPose>("/global_localization_node/set_pose", 10);
-                instance.AddListener(globalSetPose.stamp, nt::EventFlags::kValueAll,
-                    std::bind(&NFRBridgeNode::recieveGlobalSetPose, this, std::placeholders::_1));
             }
             {
                 globalSetPose.subscriber = table->GetStructTopic<frc::Pose2d>("global_set_pose").Subscribe(frc::Pose2d());
