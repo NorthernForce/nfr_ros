@@ -40,6 +40,7 @@ namespace nfr
             apriltag_detector_add_family(detector, family);
             cameraSubscription = image_transport::CameraSubscriber(this, "image", std::bind(&NFRAprilTagNode::onCamera, this, std::placeholders::_1,
                 std::placeholders::_2), "raw");
+            detectionPublisher = create_publisher<apriltag_msgs::msg::AprilTagDetectionArray>("tag_detections", 10);
         }
         void removeBadDetections(zarray_t* detections)
         {
@@ -83,6 +84,7 @@ namespace nfr
                 zarray_get(detections, i, &detection);
                 msg.detections.push_back(createApriltagDetectionMessage(detection));
             }
+            detectionPublisher->publish(msg);
             apriltag_detections_destroy(detections);
         }
     };

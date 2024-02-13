@@ -32,12 +32,18 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'rgb_camera.profile': PythonExpression(['"', resolution_width, ',', resolution_height, ',', fps, '"']),
-            'align_depth.enable': enable_depth
+            'align_depth.enable': enable_depth,
+            'enable_color': True,
+            'enable_infra1': False,
+            'enable_infra2': False,
+            'enable_depth': enable_depth,
+            'enable_gyro': False,
+            'enable_accel': False
         }],
         remappings=[
-            ('realsense_camera/color/image_raw', 'image'),
-            ('realsense_camera/color/camera_info', 'camera_info'),
-            ('realsense_camera/aligned_depth_to_color/image_raw', 'depth_raw')
+            ('color/image_raw', 'image'),
+            ('color/camera_info', 'camera_info'),
+            ('aligned_depth_to_color/image_raw', 'depth_raw')
         ]
     )
     nfr_apriltag_node = ComposableNode(
