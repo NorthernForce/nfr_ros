@@ -70,7 +70,6 @@ namespace nfr
         }
         void onCamera(const sensor_msgs::msg::Image::ConstSharedPtr& image, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
         {
-            RCLCPP_INFO(get_logger(), "Processing image");
             cv::Mat monoImage = cv_bridge::toCvShare(image, "mono8")->image;
             image_u8_t imageU8{monoImage.cols, monoImage.rows, monoImage.cols, monoImage.data};
             mutex.lock();
