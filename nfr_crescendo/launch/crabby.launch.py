@@ -26,7 +26,7 @@ def generate_launch_description():
                     ('launch_camera_server', 'True'),
                     ('enable_depth', 'True'),
                     ('camera_path', '/dev/video0'),
-                    ('camera_info_url', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'global_shutter_1280x720.yaml')),
+                    ('camera_info_url', 'package://nfr_crescendo/config/global_shutter_1280x720.yaml'),
                     ('camera_frame', 'usb_link'),
                     ('depth_frame', 'camera_link')
                 ]
