@@ -230,9 +230,11 @@ namespace nfr
                     tf2::Transform fieldToTag = tagPoses[detection.id];
                     tf2::Vector3 fieldToCameraTranslation = fieldToTag.getOrigin() +
                         tf2::quatRotate(fieldToTag.getRotation(), tf2::quatRotate(cameraToTag.getRotation(), cameraToTag.getOrigin()));
-                    tf2::Quaternion fieldToCameraRotation = fieldToTag.getRotation() * cameraToTag.getRotation().inverse();
-                    tf2::Vector3 robotTranslation = fieldToCameraTranslation - robotToCamera.getOrigin();
-                    tf2::Quaternion robotRotation = fieldToCameraRotation * robotToCamera.getRotation().inverse();
+                    tf2::Quaternion fieldToCameraRotation = (fieldToTag.getRotation() * cameraToTag.getRotation()).normalize();
+                    tf2::Vector3 robotTranslation = fieldToCameraTranslation + tf2::quatRotate(fieldToCameraRotation, robotToCamera.getOrigin());
+                    tf2::Quaternion halfRotation;
+                    halfRotation.setRPY(0, 0, M_PI);
+                    tf2::Quaternion robotRotation = (halfRotation * (robotToCamera.getRotation() * fieldToCameraRotation).normalize()).normalize();
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = baseFrame;
                     pose.header.stamp = detections->header.stamp;

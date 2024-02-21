@@ -5,11 +5,11 @@
     <joint name="realsense_camera_joint" type="fixed">
         <parent link="base_link"/>
         <child link="camera_link"/>
-        <origin xyz="0.405 0 0.18" rpy="0 0 0"/>
+        <origin xyz="0.2413 0 0.6604" rpy="0 0 0"/>
     </joint>
     <joint name="usb_camera_joint" type="fixed">
         <parent link="base_link"/>
         <child link="usb_link"/>
-        <origin xyz="0.405 0.1524 0.18" rpy="0 0 0"/>
+        <origin xyz="0.2413 0.0712 0.6604" rpy="0 0 0"/>
     </joint>
 </robot>

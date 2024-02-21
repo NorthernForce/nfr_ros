@@ -5,7 +5,7 @@ from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
 import os
 def generate_launch_description():
-    with open(os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'swervy.urdf')) as f:
+    with open(os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'crabby.urdf')) as f:
         robot_desc = f.read()
     apriltag_launch = GroupAction(
         actions=[
@@ -26,7 +26,7 @@ def generate_launch_description():
                     ('launch_camera_server', 'True'),
                     ('enable_depth', 'True'),
                     ('camera_path', '/dev/video0'),
-                    ('camera_info_url', 'package://nfr_crescendo/config/global_shutter_1280x720.yaml'),
+                    ('camera_info_url', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'global_shutter_1280x720.yaml')),
                     ('camera_frame', 'usb_link'),
                     ('depth_frame', 'camera_link')
                 ]
@@ -49,7 +49,7 @@ def generate_launch_description():
             ]
         ),
         launch_arguments=[
-            ('params_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'swervy_nav2.yaml')),
+            ('params_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'crabby_nav2.yaml')),
             ('map_file', os.path.join(get_package_share_directory('nfr_crescendo'), 'config', 'map.yaml'))
         ]
     )
