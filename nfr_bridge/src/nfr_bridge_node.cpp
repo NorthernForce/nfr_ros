@@ -84,7 +84,10 @@ namespace nfr
         std::shared_ptr<nt::NetworkTable> table;
         nt::StructSubscriber<frc::Twist2d> odomSubscriber;
         nt::IntegerSubscriber odomStamp;
+        nt::DoubleSubscriber imuSubscriber;
+        nt::IntegerSubscriber imuStamp;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher;
+        rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPublisher;
         struct
         {
             nt::StructSubscriber<frc::Pose2d> subscriber;
@@ -136,6 +139,12 @@ namespace nfr
                 odomPublisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
                 odomStamp = table->GetIntegerTopic("odometry_stamp").Subscribe(0);
                 instance.AddListener(odomStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
+            }
+            {
+                imuSubscriber = table->GetDoubleTopic("imu").Subscribe(0.0);
+                imuStamp = table->GetIntegerTopic("imu_stamp").Subscribe(0);
+                imuPublisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
+                instance.AddListener(imuStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receiveImu, this, std::placeholders::_1));
             }
             {
                 targetPose.subscriber = table->GetStructTopic<frc::Pose2d>("target_pose").Subscribe(frc::Pose2d());
@@ -231,6 +240,27 @@ namespace nfr
                 0, 0, 0, 0, 0, 0.81
             };
             odomPublisher->publish(msg);
+        }
+        void receiveImu(const nt::Event& event)
+        {
+            (void)event;
+            if (!instance.IsConnected())
+            {
+                return;
+            }
+            auto imu = imuSubscriber.GetAtomic();
+            sensor_msgs::msg::Imu msg;
+            msg.header.frame_id = "odom";
+            msg.header.stamp = toHostTime((std::chrono::nanoseconds)imuStamp.Get());
+            tf2::Quaternion quaternion;
+            quaternion.setRPY(0, 0, imu.value);
+            msg.orientation = tf2::toMsg(quaternion);
+            msg.orientation_covariance = {
+                1e6, 0, 0,
+                0, 1e6, 0,
+                0, 0, 1e-6
+            };
+            imuPublisher->publish(msg);
         }
         void recieveGlobalSetPose(const nt::Event& event)
         {

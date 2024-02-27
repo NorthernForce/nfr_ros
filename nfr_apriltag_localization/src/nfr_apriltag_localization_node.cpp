@@ -42,10 +42,10 @@ namespace nfr
     {
     private:
         double tagEdgeSize;
-        bool useMultiTagPnP;
+        bool useMultiTagPnP, rectify;
         std::string cameraFrame, baseFrame;
         std::map<int, tf2::Transform> tagPoses;
-        std::vector<cv::Point3d> singleTagCorners;
+        std::array<cv::Point3d, 4> singleTagCorners;
         std::map<int, std::vector<cv::Point3d>> multiTagCorners;
         std::shared_ptr<message_filters::Subscriber<apriltag_msgs::msg::AprilTagDetectionArray>> detectionSubscription;
         std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>> cameraInfoSubscription;
@@ -53,13 +53,15 @@ namespace nfr
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr posePublisher;
         std::unique_ptr<tf2_ros::Buffer> buffer;
         std::unique_ptr<tf2_ros::TransformListener> listener;
+        tf2::Quaternion toCVRotation, fromCVRotation;
         tf2::Vector3 fromCV(cv::Point3d point)
         {
-            return tf2::Vector3(point.z, point.x, point.y);
+            return tf2::quatRotate(fromCVRotation, tf2::Vector3(point.x, point.y, point.z));
         }
         cv::Point3d toCV(tf2::Vector3 point)
         {
-            return cv::Point3d(point.y(), point.z(), point.x());
+            auto vector = tf2::quatRotate(toCVRotation, point);
+            return cv::Point3d(vector.x(), vector.y(), vector.z());
         }
         tf2::Quaternion fromCV(cv::Mat rot)
         {
@@ -70,13 +72,18 @@ namespace nfr
             );
             tf2::Quaternion quat;
             quaternion.getRotation(quat);
-            return tf2::Quaternion(quat.z(), quat.x(), quat.y(), quat.w());
+            return fromCVRotation.inverse() * (quat * fromCVRotation);
         }
     public:
         NFRAprilTagLocalizationNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_localization_node", options)
         {
+            tf2::Matrix3x3 toCVMatrix(0, -1, 0, 0, 0, -1, 1, 0, 0);
+            toCVMatrix.getRotation(toCVRotation);
+            tf2::Matrix3x3 fromCVMatrix(0, 0, 1, -1, 0, 0, 0, -1, 0);
+            fromCVMatrix.getRotation(fromCVRotation);
             std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
                 / "field.json";
+            rectify = declare_parameter("rectify", false);
             std::string fieldPath = declare_parameter<std::string>("field_path", defaultPath);
             tagEdgeSize = declare_parameter<double>("tag_size", 0.165);
             useMultiTagPnP = declare_parameter<bool>("use_multi_tag_pnp", false);
@@ -91,18 +98,23 @@ namespace nfr
                     tag["pose"]["rotation"]["quaternion"]["Z"], tag["pose"]["rotation"]["quaternion"]["W"]});
             }
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", fieldPath.c_str());
+            std::array<tf2::Vector3, 4> templateCorners = {
+                tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
+                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2),
+                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
+                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2)
+            };
             singleTagCorners = {
-                cv::Point3d(-tagEdgeSize / 2, tagEdgeSize / 2, 0),
-                cv::Point3d(tagEdgeSize / 2, tagEdgeSize / 2, 0),
-                cv::Point3d(tagEdgeSize / 2, -tagEdgeSize / 2, 0),
-                cv::Point3d(-tagEdgeSize / 2, -tagEdgeSize / 2, 0)
+                toCV(templateCorners[0]),
+                toCV(templateCorners[1]),
+                toCV(templateCorners[2]),
+                toCV(templateCorners[3])
             };
             for (auto tag : json["tags"])
             {
                 for (size_t i = 0; i < 4; i++)
                 {
-                    tf2::Vector3 tf2Point = fromCV(singleTagCorners[i]);
-                    tf2Point = tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), tf2Point) + tagPoses[tag["ID"]].getOrigin();
+                    tf2::Vector3 tf2Point = tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]) + tagPoses[tag["ID"]].getOrigin();
                     multiTagCorners[tag["ID"]].emplace_back(toCV(tf2Point));
                 }
             }

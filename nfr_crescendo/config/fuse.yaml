@@ -34,12 +34,11 @@ local_localization_node:
       topic: 'odom'
       twist_target_frame: 'base_link'
       linear_velocity_dimensions: ['x', 'y']
-      angular_velocity_dimensions: ['yaw']
 
     imu_sensor:
       topic: 'imu'
       twist_target_frame: 'base_link'
-      angular_velocity_dimensions: ['yaw']
+      orientation_dimensions: ['yaw']
 
     publishers:
       filtered_publisher:
@@ -93,12 +92,11 @@ global_localization_node:
       topic: 'odom'
       twist_target_frame: 'base_link'
       linear_velocity_dimensions: ['x', 'y']
-      angular_velocity_dimensions: ['yaw']
 
     imu_sensor:
       topic: 'imu'
       twist_target_frame: 'base_link'
-      angular_velocity_dimensions: ['yaw']
+      orientation_dimensions: ['yaw']
 
     pose_sensor:
       topic: 'apriltag_camera/pose_estimations'

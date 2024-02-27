@@ -21,6 +21,7 @@ def generate_launch_description():
     pixel_format = LaunchConfiguration('pixel_format')
     camera_frame = LaunchConfiguration('camera_frame')
     depth_frame = LaunchConfiguration('depth_frame')
+    rectify = LaunchConfiguration('rectify')
     tag_size_argument = DeclareLaunchArgument('tag_size', default_value='0.165')
     resolution_width_argument = DeclareLaunchArgument('resolution_width', default_value='1280')
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='720')
@@ -37,6 +38,7 @@ def generate_launch_description():
     pixel_format_argument = DeclareLaunchArgument('pixel_format', default_value='YUYV')
     camera_frame_argument = DeclareLaunchArgument('camera_frame', default_value='usb_link')
     depth_frame_argument = DeclareLaunchArgument('depth_frame', default_value='camera_link')
+    rectify_argument = DeclareLaunchArgument('rectify', default_value='True')
     realsense_node = ComposableNode(
         package='realsense2_camera',
         plugin='realsense2_camera::RealSenseNodeFactory',
@@ -74,6 +76,16 @@ def generate_launch_description():
             ('image_raw', 'image')
         ]
     )
+    rectify_node = ComposableNode(
+        package='image_proc',
+        plugin='image_proc::RectifyNode',
+        name='rectify_node',
+        namespace='',
+        remappings=[
+            ('image_raw', 'image')
+        ],
+        condition=IfCondition(rectify)
+    )
     nfr_apriltag_node = ComposableNode(
         package='nfr_apriltag',
         plugin='nfr::NFRAprilTagNode',
@@ -81,7 +93,8 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'size': tag_size,
-            'family': '36h11'
+            'family': '36h11',
+            'rectify': rectify
         }]
     )
     nfr_apriltag_localization_node = ComposableNode(
@@ -93,7 +106,8 @@ def generate_launch_description():
             'field_path': field_path,
             'size': tag_size,
             'use_multi_tag_pnp': False,
-            'camera_frame': camera_frame
+            'camera_frame': camera_frame,
+            'rectify': rectify
         }]
     )
     nfr_target_finder_node = ComposableNode(
@@ -104,7 +118,8 @@ def generate_launch_description():
         parameters=[{
             'camera_frame': camera_frame,
             'depth_frame': depth_frame,
-            'use_depth_subscription': enable_depth
+            'use_depth_subscription': enable_depth,
+            'rectify': rectify
         }]
     )
     realsense_container = ComposableNodeContainer(
@@ -116,6 +131,7 @@ def generate_launch_description():
             nfr_apriltag_node,
             realsense_node,
             usb_node,
+            rectify_node,
             nfr_apriltag_localization_node,
             nfr_target_finder_node
         ]
@@ -132,7 +148,10 @@ def generate_launch_description():
             'camera_port': camera_port,
             'fps': fps
         }],
-        condition=IfCondition(launch_camera_server)
+        condition=IfCondition(launch_camera_server),
+        remappings=[
+            ("image", "image_rect")
+        ]
     )
     return LaunchDescription([
         tag_size_argument,
@@ -150,6 +169,7 @@ def generate_launch_description():
         pixel_format_argument,
         camera_frame_argument,
         depth_frame_argument,
+        rectify_argument,
         realsense_container,
         camera_node
     ])
