@@ -77,16 +77,16 @@ namespace nfr
     public:
         NFRAprilTagLocalizationNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_localization_node", options)
         {
-            tf2::Matrix3x3 toCVMatrix(0, 1, 0, -1, 0, 0, 0, 0, 1);
+            tf2::Matrix3x3 toCVMatrix(0, -1, 0, 0, 0, -1, 1, 0, 0);
             toCVMatrix.getRotation(toCVRotation);
-            tf2::Matrix3x3 fromCVMatrix(0, -1, 0, 1, 0, 0, 0, 0, 1);
+            tf2::Matrix3x3 fromCVMatrix(0, 0, 1, -1, 0, 0, 0, -1, 0);
             fromCVMatrix.getRotation(fromCVRotation);
-	    tf2::Vector3 vec(1, 2, 3);
-	    cv::Point3d point = toCV(vec);
-	    RCLCPP_INFO(get_logger(), "1, 2, 3 to CV is %f, %f, %f", point.x, point.y, point.z); 
+            tf2::Vector3 vec(1, 2, 3);
+            cv::Point3d point = toCV(vec);
+            RCLCPP_INFO(get_logger(), "1, 2, 3 to CV is %f, %f, %f", point.x, point.y, point.z); 
             vec = fromCV(point);
-	    RCLCPP_INFO(get_logger(), "%f, %f, %f", vec.x(), vec.y(), vec.z());
-	    std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
+            RCLCPP_INFO(get_logger(), "%f, %f, %f", vec.x(), vec.y(), vec.z());
+            std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
                 / "field.json";
             rectify = declare_parameter("rectify", false);
             std::string fieldPath = declare_parameter<std::string>("field_path", defaultPath);
@@ -104,10 +104,10 @@ namespace nfr
             }
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", fieldPath.c_str());
             std::array<tf2::Vector3, 4> templateCorners = {
+                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2),
                 tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
-                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 3)
+                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 3),
+                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2)
             };
             singleTagCorners = {
                 toCV(templateCorners[0]),
@@ -121,9 +121,6 @@ namespace nfr
                 {
                     tf2::Vector3 tf2Point = tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]) + tagPoses[tag["ID"]].getOrigin();
                     multiTagCorners[tag["ID"]].emplace_back(toCV(tf2Point));
-	            RCLCPP_INFO(get_logger(), "%f, %f, %f", tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]).x(),
-			tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]).y(),
-			tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]).z());
                 }
             }
             detectionSubscription = std::make_shared<message_filters::Subscriber<apriltag_msgs::msg::AprilTagDetectionArray>>(this, "tag_detections");
@@ -135,6 +132,22 @@ namespace nfr
             posePublisher = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("pose_estimations", 10);
             buffer = std::make_unique<tf2_ros::Buffer>(get_clock());
             listener = std::make_unique<tf2_ros::TransformListener>(*buffer);
+        }
+        void printRotation(tf2::Quaternion rot)
+        {
+            tf2::Matrix3x3 mat(rot);
+            double x, y, z;
+            mat.getRPY(x, y, z);
+            RCLCPP_INFO(get_logger(), "rpy: %f, %f, %f", x, y, z);
+        }
+        void printTranslation(tf2::Vector3 vec)
+        {
+            RCLCPP_INFO(get_logger(), "xyz: %f, %f, %f", vec.x(), vec.y(), vec.z());
+        }
+        void printTransform(tf2::Transform transform)
+        {
+            printTranslation(transform.getOrigin());
+            printRotation(transform.getRotation());
         }
         tf2::Transform singleTagPnP(apriltag_msgs::msg::AprilTagDetection detection, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& cameraInfo)
         {
@@ -160,10 +173,15 @@ namespace nfr
             k.at<double>(2, 0) = cameraInfo->k[6];
             k.at<double>(2, 1) = cameraInfo->k[7];
             k.at<double>(2, 2) = cameraInfo->k[8];
+            for (int i = 0; i < 4; i++)
+            {
+                RCLCPP_INFO(get_logger(), "%f, %f, %f", singleTagCorners[i].x, singleTagCorners[i].y, singleTagCorners[i].z);
+            }
             cv::solvePnP(singleTagCorners, detectionCorners, k, d, rvec, tvec, false, cv::SOLVEPNP_IPPE_SQUARE);
             cv::Mat rot(3, 3, CV_64FC1);
             cv::Rodrigues(rvec, rot);
             auto quaternion = fromCV(rot);
+            RCLCPP_INFO(get_logger(), "%f, %f, %f", tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0));
             tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
             return tf2::Transform(quaternion, translation);
         }
@@ -177,8 +195,8 @@ namespace nfr
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);
                     detectionCorners.push_back(cv::Point2d(detections.detections[i].corners[j].x, detections.detections[i].corners[j].y));
-		    RCLCPP_INFO(get_logger(), "%f, %f, %f", multiTagCorners[detections.detections[i].id][j].x, multiTagCorners[detections.detections[i].id][j].y,
-			multiTagCorners[detections.detections[i].id][j].z);
+                    RCLCPP_INFO(get_logger(), "%f, %f, %f", multiTagCorners[detections.detections[i].id][j].x, multiTagCorners[detections.detections[i].id][j].y,
+                        multiTagCorners[detections.detections[i].id][j].z);
                 }
             }
             cv::Mat d(5, 1, CV_64FC1);
@@ -203,7 +221,8 @@ namespace nfr
             cv::Rodrigues(rvec, rot);
             tf2::Quaternion quaternion = fromCV(rot);
             tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
-	    RCLCPP_INFO(get_logger(), "%f, %f, %f", translation.x(), translation.y(), translation.z());
+	        RCLCPP_INFO(get_logger(), "%f, %f, %f", tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0));
+	        RCLCPP_INFO(get_logger(), "%f, %f, %f", translation.x(), translation.y(), translation.z());
             return tf2::Transform(quaternion, translation).inverse();
         }
         void onCameraCallback(apriltag_msgs::msg::AprilTagDetectionArray::ConstSharedPtr detections,
@@ -223,9 +242,9 @@ namespace nfr
                 cameraFrame.empty() ? detections->header.frame_id : cameraFrame, tf2::TimePointZero);
             tf2::Transform robotToCamera;
             tf2::fromMsg(robotToCameraMessage.transform, robotToCamera);
-            if (useMultiTagPnP)
+            if (useMultiTagPnP && detections->detections.size() > 1)
             {
-                tf2::Transform fieldToCamera = multiTagPnP(*detections, cameraInfo);
+                tf2::Transform fieldToCamera = multiTagPnP(*detections, cameraInfo).inverse();
                 tf2::Vector3 robotTranslation = fieldToCamera.getOrigin() - robotToCamera.getOrigin();
                 tf2::Quaternion robotRotation = fieldToCamera.getRotation() * robotToCamera.getRotation().inverse();
                 geometry_msgs::msg::PoseWithCovarianceStamped pose;
@@ -251,13 +270,9 @@ namespace nfr
                 {
                     tf2::Transform cameraToTag = singleTagPnP(detection, cameraInfo);
                     tf2::Transform fieldToTag = tagPoses[detection.id];
-                    tf2::Vector3 fieldToCameraTranslation = fieldToTag.getOrigin() +
-                        tf2::quatRotate(fieldToTag.getRotation(), tf2::quatRotate(cameraToTag.getRotation(), cameraToTag.getOrigin()));
-                    tf2::Quaternion fieldToCameraRotation = (fieldToTag.getRotation() * cameraToTag.getRotation()).normalize();
-                    tf2::Vector3 robotTranslation = fieldToCameraTranslation + tf2::quatRotate(fieldToCameraRotation, robotToCamera.getOrigin());
-                    tf2::Quaternion halfRotation;
-                    halfRotation.setRPY(0, 0, M_PI);
-                    tf2::Quaternion robotRotation = (halfRotation * (robotToCamera.getRotation() * fieldToCameraRotation).normalize()).normalize();
+                    tf2::Transform fieldToCamera = fieldToTag * cameraToTag;
+                    tf2::Vector3 robotTranslation = fieldToCamera.getOrigin() - robotToCamera.getOrigin();
+                    tf2::Quaternion robotRotation = fieldToCamera.getRotation() * robotToCamera.getRotation().inverse();
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = baseFrame;
                     pose.header.stamp = detections->header.stamp;
