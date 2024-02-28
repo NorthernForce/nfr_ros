@@ -24,7 +24,6 @@ def generate_launch_description():
     resolution_height_argument = DeclareLaunchArgument('resolution_height', default_value='720')
     field_path_argument = DeclareLaunchArgument('field_path', default_value=PathJoinSubstitution((FindPackageShare('nfr_charged_up'),
         'config', 'field.json')))
-    enable_depth_argument = DeclareLaunchArgument('enable_depth', default_value='True')
     camera_name_argument = DeclareLaunchArgument('camera_name', default_value='default')
     camera_port_argument = DeclareLaunchArgument('camera_port', default_value='1181')
     fps_argument = DeclareLaunchArgument('fps', default_value='8')
@@ -69,7 +68,7 @@ def generate_launch_description():
         parameters=[{
             'field_path': field_path,
             'size': tag_size,
-            'use_multi_tag_pnp': True,
+            'use_multi_tag_pnp': False,
             'camera_frame': camera_frame
         }]
     )
@@ -117,7 +116,6 @@ def generate_launch_description():
         resolution_width_argument,
         resolution_height_argument,
         field_path_argument,
-        enable_depth_argument,
         camera_name_argument,
         camera_port_argument,
         fps_argument,

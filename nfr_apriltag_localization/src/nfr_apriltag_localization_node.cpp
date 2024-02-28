@@ -77,11 +77,16 @@ namespace nfr
     public:
         NFRAprilTagLocalizationNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_apriltag_localization_node", options)
         {
-            tf2::Matrix3x3 toCVMatrix(0, -1, 0, 0, 0, -1, 1, 0, 0);
+            tf2::Matrix3x3 toCVMatrix(0, 1, 0, -1, 0, 0, 0, 0, 1);
             toCVMatrix.getRotation(toCVRotation);
-            tf2::Matrix3x3 fromCVMatrix(0, 0, 1, -1, 0, 0, 0, -1, 0);
+            tf2::Matrix3x3 fromCVMatrix(0, -1, 0, 1, 0, 0, 0, 0, 1);
             fromCVMatrix.getRotation(fromCVRotation);
-            std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
+	    tf2::Vector3 vec(1, 2, 3);
+	    cv::Point3d point = toCV(vec);
+	    RCLCPP_INFO(get_logger(), "1, 2, 3 to CV is %f, %f, %f", point.x, point.y, point.z); 
+            vec = fromCV(point);
+	    RCLCPP_INFO(get_logger(), "%f, %f, %f", vec.x(), vec.y(), vec.z());
+	    std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
                 / "field.json";
             rectify = declare_parameter("rectify", false);
             std::string fieldPath = declare_parameter<std::string>("field_path", defaultPath);
@@ -100,9 +105,9 @@ namespace nfr
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", fieldPath.c_str());
             std::array<tf2::Vector3, 4> templateCorners = {
                 tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2),
+                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2),
                 tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2)
+                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 3)
             };
             singleTagCorners = {
                 toCV(templateCorners[0]),
@@ -116,6 +121,9 @@ namespace nfr
                 {
                     tf2::Vector3 tf2Point = tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]) + tagPoses[tag["ID"]].getOrigin();
                     multiTagCorners[tag["ID"]].emplace_back(toCV(tf2Point));
+	            RCLCPP_INFO(get_logger(), "%f, %f, %f", tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]).x(),
+			tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]).y(),
+			tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), templateCorners[i]).z());
                 }
             }
             detectionSubscription = std::make_shared<message_filters::Subscriber<apriltag_msgs::msg::AprilTagDetectionArray>>(this, "tag_detections");
@@ -169,6 +177,8 @@ namespace nfr
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);
                     detectionCorners.push_back(cv::Point2d(detections.detections[i].corners[j].x, detections.detections[i].corners[j].y));
+		    RCLCPP_INFO(get_logger(), "%f, %f, %f", multiTagCorners[detections.detections[i].id][j].x, multiTagCorners[detections.detections[i].id][j].y,
+			multiTagCorners[detections.detections[i].id][j].z);
                 }
             }
             cv::Mat d(5, 1, CV_64FC1);
@@ -193,6 +203,7 @@ namespace nfr
             cv::Rodrigues(rvec, rot);
             tf2::Quaternion quaternion = fromCV(rot);
             tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
+	    RCLCPP_INFO(get_logger(), "%f, %f, %f", translation.x(), translation.y(), translation.z());
             return tf2::Transform(quaternion, translation).inverse();
         }
         void onCameraCallback(apriltag_msgs::msg::AprilTagDetectionArray::ConstSharedPtr detections,
