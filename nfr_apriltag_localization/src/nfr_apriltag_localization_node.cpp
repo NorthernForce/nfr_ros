@@ -104,10 +104,10 @@ namespace nfr
             }
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", fieldPath.c_str());
             std::array<tf2::Vector3, 4> templateCorners = {
-                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2),
                 tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
-                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 3),
-                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2)
+                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2),
+                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
+                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2)
             };
             singleTagCorners = {
                 toCV(templateCorners[0]),
@@ -116,10 +116,10 @@ namespace nfr
                 toCV(templateCorners[3])
             };
             std::array<tf2::Vector3, 4> otherCorners = {
+                tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
                 tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2),
                 tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 3),
-                tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2)
+                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2)
             };
             for (auto tag : json["tags"])
             {
@@ -192,6 +192,7 @@ namespace nfr
             std::vector<cv::Point2d> detectionCorners;
             for (size_t i = 0; i < detections.detections.size(); i++)
             {
+		RCLCPP_INFO(get_logger(), "PnP for tag %d", detections.detections[i].id);
                 for (size_t j = 0; j < 4; j++)
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);

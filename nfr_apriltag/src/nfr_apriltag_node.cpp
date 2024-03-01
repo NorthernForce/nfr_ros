@@ -82,6 +82,7 @@ namespace nfr
             {
                 apriltag_detection* detection;
                 zarray_get(detections, i, &detection);
+		RCLCPP_INFO(get_logger(), "Detected %d, %d", i, detection->id);
                 msg.detections.push_back(createApriltagDetectionMessage(detection));
             }
             detectionPublisher->publish(msg);
