@@ -110,16 +110,16 @@ namespace nfr
                 tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2)
             };
             singleTagCorners = {
-                toCV(templateCorners[0]),
-                toCV(templateCorners[1]),
-                toCV(templateCorners[2]),
-                toCV(templateCorners[3])
+		cv::Point3d(-tagEdgeSize / 2, tagEdgeSize / 2, 0),
+		cv::Point3d(tagEdgeSize / 2, tagEdgeSize / 2, 0),
+		cv::Point3d(tagEdgeSize / 2, -tagEdgeSize / 2, 0),
+		cv::Point3d(-tagEdgeSize / 2, -tagEdgeSize / 2, 0)
             };
             std::array<tf2::Vector3, 4> otherCorners = {
-                tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
-                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2)
+                fromCV(singleTagCorners[0]),
+		fromCV(singleTagCorners[1]),
+		fromCV(singleTagCorners[2]),
+		fromCV(singleTagCorners[3])
             };
             for (auto tag : json["tags"])
             {
@@ -197,7 +197,8 @@ namespace nfr
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);
                     detectionCorners.push_back(cv::Point2d(detections.detections[i].corners[j].x, detections.detections[i].corners[j].y));
-                }
+                    RCLCPP_INFO(get_logger(), "%f, %f", detections.detections[i].corners[j].x, detections.detections[i].corners[j].y);
+		}
             }
             cv::Mat d(5, 1, CV_64FC1);
             cv::Mat k(3, 3, CV_64FC1);
