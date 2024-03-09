@@ -55,6 +55,19 @@ namespace nfr
                 }
             }
         }
+	void removeDuplicateDetections(zarray_t* detections)
+	{
+	    for (int i = 0; i < zarray_size(detections) - 1; i++)
+	    {
+		apriltag_detection* detection, *next_detection;
+		zarray_get(detections, i, &detection);
+		zarray_get(detections, i + 1, &next_detection);
+		if (detection->id == next_detection->id) {
+		    zarray_remove_index(detections, detection->decision_margin < next_detection->decision_margin ? i : (i + 1), false);
+		    i--;
+		}
+	    }
+	}
         apriltag_msgs::msg::AprilTagDetection createApriltagDetectionMessage(apriltag_detection* detection)
         {
             apriltag_msgs::msg::AprilTagDetection detectionMessage;
@@ -78,10 +91,12 @@ namespace nfr
             apriltag_msgs::msg::AprilTagDetectionArray msg;
             msg.header = image->header;
             removeBadDetections(detections);
-            for (size_t i = 0; i < zarray_size(detections); i++)
+            removeDuplicateDetections(detections);
+	    for (size_t i = 0; i < zarray_size(detections); i++)
             {
                 apriltag_detection* detection;
                 zarray_get(detections, i, &detection);
+		RCLCPP_INFO(get_logger(), "Detected %d, %d", i, detection->id);
                 msg.detections.push_back(createApriltagDetectionMessage(detection));
             }
             detectionPublisher->publish(msg);

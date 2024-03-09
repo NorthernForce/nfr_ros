@@ -14,7 +14,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     [
                         os.path.join(get_package_share_directory('nfr_apriltag'), 'launch'),
-                        '/usb_apriltag_realsense.launch.py'
+                        '/usb_apriltag.launch.py'
                     ]
                 ),
                 launch_arguments=[
@@ -24,11 +24,9 @@ def generate_launch_description():
                     ('resolution_height', '720'),
                     ('fps', '15'),
                     ('launch_camera_server', 'True'),
-                    ('enable_depth', 'True'),
                     ('camera_path', '/dev/video0'),
                     ('camera_info_url', 'package://nfr_crescendo/config/global_shutter_1280x720.yaml'),
-                    ('camera_frame', 'usb_link'),
-                    ('depth_frame', 'camera_link')
+                    ('camera_frame', 'usb_link')
                 ]
             )
         ]

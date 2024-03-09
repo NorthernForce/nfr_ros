@@ -25,6 +25,7 @@ namespace nfr
         using DepthSynchronizer = message_filters::Synchronizer<DepthPolicy>;
         using Policy = message_filters::sync_policies::ApproximateTime<apriltag_msgs::msg::AprilTagDetectionArray, sensor_msgs::msg::CameraInfo>;
         using Synchronizer = message_filters::Synchronizer<Policy>;
+        bool rectify;
         std::shared_ptr<message_filters::Subscriber<apriltag_msgs::msg::AprilTagDetectionArray>> detectionSubscription;
         std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>> cameraInfoSubscription;
         std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>> depthInfoSubscription;
@@ -38,6 +39,7 @@ namespace nfr
     public:
         NFRTargetFinderNode(rclcpp::NodeOptions options) : rclcpp::Node("nfr_target_finder_node", options)
         {
+            rectify = declare_parameter("rectify", true);
             useDepthSensor = declare_parameter<bool>("use_depth_subscription", true);
             detectionSubscription = std::make_shared<message_filters::Subscriber<apriltag_msgs::msg::AprilTagDetectionArray>>(this, "tag_detections");
             cameraInfoSubscription = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(this, "camera_info");
@@ -68,7 +70,15 @@ namespace nfr
         }
         cv::Point2d transformPoint(cv::Point2d cameraPoint, geometry_msgs::msg::TransformStamped transform, sensor_msgs::msg::CameraInfo cameraInfo, sensor_msgs::msg::CameraInfo depthInfo)
         {
-            cv::Mat cameraK = cv::Mat(cameraInfo.k, true).reshape(0, 3);
+            cv::Mat cameraK;
+            if (rectify)
+            {
+                cameraK = cv::Mat(cameraInfo.p, true).reshape(0, 3)(cv::Rect(0, 0, 3, 3));
+            }
+            else
+            {
+                cameraK = cv::Mat(cameraInfo.k, true).reshape(0, 3);
+            }
             cv::Mat depthK = cv::Mat(depthInfo.k, true).reshape(0, 3);
             auto quaternion = transform.transform.rotation;
             auto translation = transform.transform.translation;
