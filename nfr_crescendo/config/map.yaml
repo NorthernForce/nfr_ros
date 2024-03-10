@@ -1,6 +1,6 @@
 image: map.png
 mode: scale
-resolution: 0.00505251842
+resolution: 0.00507614213
 origin: [0.000000, 0.000000, 0.000000]
 negate: 0
 occupied_thresh: 1.0
