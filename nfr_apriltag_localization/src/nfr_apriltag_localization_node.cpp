@@ -103,23 +103,17 @@ namespace nfr
                     tag["pose"]["rotation"]["quaternion"]["Z"], tag["pose"]["rotation"]["quaternion"]["W"]});
             }
             RCLCPP_INFO(get_logger(), "Loaded all tags from %s", fieldPath.c_str());
-            std::array<tf2::Vector3, 4> templateCorners = {
-                tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
-                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
-                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2)
-            };
             singleTagCorners = {
-		cv::Point3d(-tagEdgeSize / 2, tagEdgeSize / 2, 0),
-		cv::Point3d(tagEdgeSize / 2, tagEdgeSize / 2, 0),
-		cv::Point3d(tagEdgeSize / 2, -tagEdgeSize / 2, 0),
-		cv::Point3d(-tagEdgeSize / 2, -tagEdgeSize / 2, 0)
+                cv::Point3d(-tagEdgeSize / 2, tagEdgeSize / 2, 0),
+                cv::Point3d(tagEdgeSize / 2, tagEdgeSize / 2, 0),
+                cv::Point3d(tagEdgeSize / 2, -tagEdgeSize / 2, 0),
+                cv::Point3d(-tagEdgeSize / 2, -tagEdgeSize / 2, 0)
             };
             std::array<tf2::Vector3, 4> otherCorners = {
                 fromCV(singleTagCorners[0]),
-		fromCV(singleTagCorners[1]),
-		fromCV(singleTagCorners[2]),
-		fromCV(singleTagCorners[3])
+                fromCV(singleTagCorners[1]),
+                fromCV(singleTagCorners[2]),
+                fromCV(singleTagCorners[3])
             };
             for (auto tag : json["tags"])
             {
@@ -192,13 +186,12 @@ namespace nfr
             std::vector<cv::Point2d> detectionCorners;
             for (size_t i = 0; i < detections.detections.size(); i++)
             {
-		RCLCPP_INFO(get_logger(), "PnP for tag %d", detections.detections[i].id);
                 for (size_t j = 0; j < 4; j++)
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);
                     detectionCorners.push_back(cv::Point2d(detections.detections[i].corners[j].x, detections.detections[i].corners[j].y));
                     RCLCPP_INFO(get_logger(), "%f, %f", detections.detections[i].corners[j].x, detections.detections[i].corners[j].y);
-		}
+		        }
             }
             cv::Mat d(5, 1, CV_64FC1);
             cv::Mat k(3, 3, CV_64FC1);

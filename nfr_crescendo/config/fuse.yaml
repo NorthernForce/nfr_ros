@@ -38,6 +38,7 @@ local_localization_node:
     imu_sensor:
       topic: 'imu'
       twist_target_frame: 'base_link'
+      linear_acceleration_dimensions: ['x', 'y']
       orientation_dimensions: ['yaw']
 
     publishers:
@@ -96,6 +97,7 @@ global_localization_node:
     imu_sensor:
       topic: 'imu'
       twist_target_frame: 'base_link'
+      linear_acceleration_dimensions: ['x', 'y']
       orientation_dimensions: ['yaw']
 
     pose_sensor:

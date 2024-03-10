@@ -23,6 +23,7 @@
 #include <nfr_msgs/msg/target_list.hpp>
 #include <frc/geometry/Pose2d.h>
 #include <frc/geometry/Twist2d.h>
+#include <frc/geometry/Twist3d.h>
 #include <fuse_msgs/srv/set_pose.hpp>
 double getYawFromQuaternion(const geometry_msgs::msg::Quaternion& quat)
 {
@@ -84,7 +85,7 @@ namespace nfr
         std::shared_ptr<nt::NetworkTable> table;
         nt::StructSubscriber<frc::Twist2d> odomSubscriber;
         nt::IntegerSubscriber odomStamp;
-        nt::DoubleSubscriber imuSubscriber;
+        nt::StructSubscriber<frc::Twist3d> imuSubscriber;
         nt::IntegerSubscriber imuStamp;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher;
         rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPublisher;
@@ -141,7 +142,7 @@ namespace nfr
                 instance.AddListener(odomStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
             }
             {
-                imuSubscriber = table->GetDoubleTopic("imu").Subscribe(0.0);
+                imuSubscriber = table->GetStructTopic<frc::Twist3d>("imu").Subscribe(frc::Twist3d{});
                 imuStamp = table->GetIntegerTopic("imu_stamp").Subscribe(0);
                 imuPublisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
                 instance.AddListener(imuStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receiveImu, this, std::placeholders::_1));
@@ -253,12 +254,20 @@ namespace nfr
             msg.header.frame_id = "odom";
             msg.header.stamp = toHostTime((std::chrono::nanoseconds)imuStamp.Get());
             tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, imu.value);
+            quaternion.setRPY(0, 0, (double)imu.value.rz);
             msg.orientation = tf2::toMsg(quaternion);
             msg.orientation_covariance = {
                 1e6, 0, 0,
                 0, 1e6, 0,
                 0, 0, 1e-6
+            };
+            msg.linear_acceleration.x = (double)imu.value.dx;
+            msg.linear_acceleration.y = (double)imu.value.dy;
+            msg.linear_acceleration.z = (double)imu.value.dz;
+            msg.linear_acceleration_covariance = {
+                0.02, 0, 0,
+                0, 0.02, 0,
+                0, 0, 0.02
             };
             imuPublisher->publish(msg);
         }
@@ -319,7 +328,25 @@ namespace nfr
             tf2::Quaternion quaternion;
             quaternion.setRPY(0, 0, (double)pose.value.Rotation().Radians());
             goal.pose.pose.orientation = tf2::toMsg(quaternion);
-            targetPose.future = targetPose.client->async_send_goal(goal);
+            if (!targetPose.client->wait_for_action_server())
+            {
+                RCLCPP_ERROR(get_logger(), "Stuck waiting for action server");
+                return;
+            }
+            auto options = rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions();
+            options.goal_response_callback = std::bind(&NFRBridgeNode::goalResponseCallback, this, std::placeholders::_1);
+            targetPose.client->async_send_goal(goal);
+        }
+        void goalResponseCallback(const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr& goalHandle)
+        {
+            if (!goalHandle)
+            {
+                RCLCPP_ERROR(get_logger(), "Goal was rejected by the server");
+            }
+            else
+            {
+                RCLCPP_INFO(get_logger(), "Goal was accepted by the server");
+            }
         }
         void recieveCancel(const nt::Event& event)
         {

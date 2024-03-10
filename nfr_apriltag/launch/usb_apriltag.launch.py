@@ -68,7 +68,7 @@ def generate_launch_description():
         parameters=[{
             'field_path': field_path,
             'size': tag_size,
-            'use_multi_tag_pnp': False,
+            'use_multi_tag_pnp': True,
             'camera_frame': camera_frame
         }]
     )
