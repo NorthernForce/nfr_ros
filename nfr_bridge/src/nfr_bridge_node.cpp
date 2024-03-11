@@ -83,12 +83,17 @@ namespace nfr
     private:
         nt::NetworkTableInstance instance;
         std::shared_ptr<nt::NetworkTable> table;
-        nt::StructSubscriber<frc::Twist2d> odomSubscriber;
-        nt::IntegerSubscriber odomStamp;
-        nt::StructSubscriber<frc::Twist3d> imuSubscriber;
-        nt::IntegerSubscriber imuStamp;
-        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odomPublisher;
-        rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPublisher;
+        struct
+        {
+            nt::StructSubscriber<frc::Twist2d> subscriber;
+            nt::IntegerSubscriber stamp;
+            rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher;
+        } odom;
+        struct {
+            nt::StructSubscriber<frc::Twist3d> subscriber;
+            nt::IntegerSubscriber stamp;
+            rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr publisher;
+        } imu;
         struct
         {
             nt::StructSubscriber<frc::Pose2d> subscriber;
@@ -136,16 +141,16 @@ namespace nfr
             table = instance.GetTable(tableName);
             instance.SetServerTeam(declare_parameter("team_number", 172));
             {
-                odomSubscriber = table->GetStructTopic<frc::Twist2d>("odometry").Subscribe(frc::Twist2d());
-                odomPublisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
-                odomStamp = table->GetIntegerTopic("odometry_stamp").Subscribe(0);
-                instance.AddListener(odomStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
+                odom.subscriber = table->GetStructTopic<frc::Twist2d>("odometry").Subscribe(frc::Twist2d());
+                odom.publisher = create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+                odom.stamp = table->GetIntegerTopic("odometry_stamp").Subscribe(0);
+                instance.AddListener(odom.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::recieveOdometry, this, std::placeholders::_1));
             }
             {
-                imuSubscriber = table->GetStructTopic<frc::Twist3d>("imu").Subscribe(frc::Twist3d{});
-                imuStamp = table->GetIntegerTopic("imu_stamp").Subscribe(0);
-                imuPublisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
-                instance.AddListener(imuStamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receiveImu, this, std::placeholders::_1));
+                imu.subscriber = table->GetStructTopic<frc::Twist3d>("imu").Subscribe(frc::Twist3d{});
+                imu.stamp = table->GetIntegerTopic("imu_stamp").Subscribe(0);
+                imu.publisher = create_publisher<sensor_msgs::msg::Imu>("imu", 10);
+                instance.AddListener(imu.stamp, nt::EventFlags::kValueAll, std::bind(&NFRBridgeNode::receiveImu, this, std::placeholders::_1));
             }
             {
                 targetPose.subscriber = table->GetStructTopic<frc::Pose2d>("target_pose").Subscribe(frc::Pose2d());
@@ -224,11 +229,11 @@ namespace nfr
             {
                 return;
             }
-            auto odometry = odomSubscriber.GetAtomic();
+            auto odometry = odom.subscriber.GetAtomic();
             nav_msgs::msg::Odometry msg;
             msg.child_frame_id = "base_link";
             msg.header.frame_id = "odom";
-            msg.header.stamp = toHostTime((std::chrono::nanoseconds)odomStamp.Get());
+            msg.header.stamp = toHostTime((std::chrono::nanoseconds)odom.stamp.Get());
             msg.twist.twist.linear.x = (double)odometry.value.dx;
             msg.twist.twist.linear.y = (double)odometry.value.dy;
             msg.twist.twist.angular.z = (double)odometry.value.dtheta;
@@ -240,7 +245,7 @@ namespace nfr
                 0, 0, 0, 0, 1e6, 0,
                 0, 0, 0, 0, 0, 0.81
             };
-            odomPublisher->publish(msg);
+            odom.publisher->publish(msg);
         }
         void receiveImu(const nt::Event& event)
         {
@@ -249,27 +254,27 @@ namespace nfr
             {
                 return;
             }
-            auto imu = imuSubscriber.GetAtomic();
+            auto gyro = imu.subscriber.GetAtomic();
             sensor_msgs::msg::Imu msg;
             msg.header.frame_id = "odom";
-            msg.header.stamp = toHostTime((std::chrono::nanoseconds)imuStamp.Get());
+            msg.header.stamp = toHostTime((std::chrono::nanoseconds)imu.stamp.Get());
             tf2::Quaternion quaternion;
-            quaternion.setRPY(0, 0, (double)imu.value.rz);
+            quaternion.setRPY(0, 0, (double)gyro.value.rz);
             msg.orientation = tf2::toMsg(quaternion);
             msg.orientation_covariance = {
                 1e6, 0, 0,
                 0, 1e6, 0,
                 0, 0, 1e-6
             };
-            msg.linear_acceleration.x = (double)imu.value.dx;
-            msg.linear_acceleration.y = (double)imu.value.dy;
-            msg.linear_acceleration.z = (double)imu.value.dz;
+            msg.linear_acceleration.x = (double)gyro.value.dx;
+            msg.linear_acceleration.y = (double)gyro.value.dy;
+            msg.linear_acceleration.z = (double)gyro.value.dz;
             msg.linear_acceleration_covariance = {
                 0.02, 0, 0,
                 0, 0.02, 0,
                 0, 0, 0.02
             };
-            imuPublisher->publish(msg);
+            imu.publisher->publish(msg);
         }
         void recieveGlobalSetPose(const nt::Event& event)
         {

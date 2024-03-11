@@ -101,8 +101,8 @@ def generate_launch_description():
         namespace='',
         parameters=[{
             'camera_name': camera_name,
-            'resolution_width': resolution_width,
-            'resolution_height': resolution_height,
+            'resolution_width': 320,
+            'resolution_height': 240,
             'camera_port': camera_port,
             'fps': fps
         }],
