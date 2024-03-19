@@ -42,7 +42,7 @@ namespace nfr
     {
     private:
         double tagEdgeSize;
-        bool useMultiTagPnP, rectify;
+        bool useMultiTagPnP;
         std::string cameraFrame, baseFrame;
         std::map<int, tf2::Transform> tagPoses;
         std::array<cv::Point3d, 4> singleTagCorners;
@@ -88,7 +88,6 @@ namespace nfr
             RCLCPP_INFO(get_logger(), "%f, %f, %f", vec.x(), vec.y(), vec.z());
             std::filesystem::path defaultPath = (std::filesystem::path)ament_index_cpp::get_package_share_directory("nfr_charged_up") / "config"
                 / "field.json";
-            rectify = declare_parameter("rectify", false);
             std::string fieldPath = declare_parameter<std::string>("field_path", defaultPath);
             tagEdgeSize = declare_parameter<double>("tag_size", 0.165);
             useMultiTagPnP = declare_parameter<bool>("use_multi_tag_pnp", false);
@@ -190,7 +189,6 @@ namespace nfr
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);
                     detectionCorners.push_back(cv::Point2d(detections.detections[i].corners[j].x, detections.detections[i].corners[j].y));
-                    RCLCPP_INFO(get_logger(), "%f, %f", detections.detections[i].corners[j].x, detections.detections[i].corners[j].y);
 		        }
             }
             cv::Mat d(5, 1, CV_64FC1);
@@ -236,18 +234,17 @@ namespace nfr
             tf2::fromMsg(robotToCameraMessage.transform, robotToCamera);
             if (useMultiTagPnP && detections->detections.size() > 1)
             {
-                tf2::Transform fieldToCamera = multiTagPnP(*detections, cameraInfo).inverse();
-                RCLCPP_INFO(get_logger(), "Multi tag PnP");
+                tf2::Transform fieldToCamera = multiTagPnP(*detections, cameraInfo);
                 printTransform(fieldToCamera);
-                tf2::Vector3 robotTranslation = fieldToCamera.getOrigin() - robotToCamera.getOrigin();
-                tf2::Quaternion robotRotation = fieldToCamera.getRotation() * robotToCamera.getRotation().inverse();
+                tf2::Transform robotPose = robotToCamera * fieldToCamera.inverse();
+                RCLCPP_INFO(get_logger(), "Calculated pose using MultiTagPnP");
                 geometry_msgs::msg::PoseWithCovarianceStamped pose;
                 pose.header.frame_id = baseFrame;
                 pose.header.stamp = detections->header.stamp;
-                pose.pose.pose.position.x = robotTranslation.getX();
-                pose.pose.pose.position.y = robotTranslation.getY();
-                pose.pose.pose.position.z = robotTranslation.getZ();
-                pose.pose.pose.orientation = tf2::toMsg(robotRotation);
+                pose.pose.pose.position.x = robotPose.getOrigin().getX();
+                pose.pose.pose.position.y = robotPose.getOrigin().getY();
+                pose.pose.pose.position.z = robotPose.getOrigin().getZ();
+                pose.pose.pose.orientation = tf2::toMsg(robotPose.getRotation());
                 pose.pose.covariance = {
                     0.2, 0, 0, 0, 0, 0,
                     0, 0.2, 0, 0, 0, 0,
@@ -264,18 +261,15 @@ namespace nfr
                 {
                     tf2::Transform cameraToTag = singleTagPnP(detection, cameraInfo);
                     tf2::Transform fieldToTag = tagPoses[detection.id];
-                    tf2::Transform fieldToCamera = fieldToTag * cameraToTag;
-                    RCLCPP_INFO(get_logger(), "Single tag PnP");
-                    printTransform(fieldToCamera);
-                    tf2::Vector3 robotTranslation = fieldToCamera.getOrigin() - robotToCamera.getOrigin();
-                    tf2::Quaternion robotRotation = fieldToCamera.getRotation() * robotToCamera.getRotation().inverse();
+                    tf2::Transform robotPose = robotToCamera * cameraToTag.inverse() * fieldToTag;
+                    RCLCPP_INFO(get_logger(), "Calculated pose using SingleTagPnP");
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = baseFrame;
                     pose.header.stamp = detections->header.stamp;
-                    pose.pose.pose.position.x = robotTranslation.getX();
-                    pose.pose.pose.position.y = robotTranslation.getY();
-                    pose.pose.pose.position.z = robotTranslation.getZ();
-                    pose.pose.pose.orientation = tf2::toMsg(robotRotation);
+                    pose.pose.pose.position.x = robotPose.getOrigin().getX();
+                    pose.pose.pose.position.y = robotPose.getOrigin().getY();
+                    pose.pose.pose.position.z = robotPose.getOrigin().getZ();
+                    pose.pose.pose.orientation = tf2::toMsg(robotPose.getRotation() * tf2::Quaternion(0, 0, 1, 0));
                     pose.pose.covariance = {
                         0.2, 0, 0, 0, 0, 0,
                         0, 0.2, 0, 0, 0, 0,
