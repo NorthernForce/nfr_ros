@@ -109,17 +109,24 @@ namespace nfr
                 cv::Point3d(-tagEdgeSize / 2, -tagEdgeSize / 2, 0)
             };
             std::array<tf2::Vector3, 4> otherCorners = {
-                fromCV(singleTagCorners[0]),
-                fromCV(singleTagCorners[1]),
-                fromCV(singleTagCorners[2]),
-                fromCV(singleTagCorners[3])
+                tf2::Vector3(0, -tagEdgeSize / 2, -tagEdgeSize / 2),
+                tf2::Vector3(0, tagEdgeSize / 2, -tagEdgeSize / 2),
+                tf2::Vector3(0, tagEdgeSize / 2, tagEdgeSize / 2),
+                tf2::Vector3(0, -tagEdgeSize / 2, tagEdgeSize / 2)
             };
+            // std::array<tf2::Vector3, 4> otherCorners = {
+            //     fromCV(cv::Point3d(-tagEdgeSize, tagEdgeSize, 0)),
+            //     fromCV(cv::Point3d(tagEdgeSize, tagEdgeSize, 0)),
+            //     fromCV(cv::Point3d(tagEdgeSize, -tagEdgeSize, 0)),
+            //     fromCV(cv::Point3d(-tagEdgeSize, -tagEdgeSize, 0))
+            // };
             for (auto tag : json["tags"])
             {
                 for (size_t i = 0; i < 4; i++)
                 {
-                    tf2::Vector3 tf2Point = tf2::quatRotate(tagPoses[tag["ID"]].getRotation(), otherCorners[i]) + tagPoses[tag["ID"]].getOrigin();
-                    multiTagCorners[tag["ID"]].emplace_back(toCV(tf2Point));
+                    multiTagCorners[tag["ID"]].push_back(toCV(tagPoses[tag["ID"]](otherCorners[i])));
+                    RCLCPP_INFO(get_logger(), "Tag %ld corner %ld: %f, %f, %f", tag["ID"], i, multiTagCorners[tag["ID"]][i].x,
+                        multiTagCorners[tag["ID"]][i].y, multiTagCorners[tag["ID"]][i].z);
                 }
             }
             detectionSubscription = std::make_shared<message_filters::Subscriber<apriltag_msgs::msg::AprilTagDetectionArray>>(this, "tag_detections");
@@ -189,6 +196,9 @@ namespace nfr
                 {
                     cornerTransforms.push_back(multiTagCorners[detections.detections[i].id][j]);
                     detectionCorners.push_back(cv::Point2d(detections.detections[i].corners[j].x, detections.detections[i].corners[j].y));
+                    RCLCPP_INFO(get_logger(), "Tag %ld corner %ld: %f, %f, %f", detections.detections[i].id, j, multiTagCorners[detections.detections[i].id][j].x,
+                        multiTagCorners[detections.detections[i].id][j].y, multiTagCorners[detections.detections[i].id][j].z);
+                    RCLCPP_INFO(get_logger(), "Detection %ld corner %ld: %f, %f", i, j, detections.detections[i].corners[j].x, detections.detections[i].corners[j].y);
 		        }
             }
             cv::Mat d(5, 1, CV_64FC1);
@@ -212,6 +222,7 @@ namespace nfr
             cv::Mat rot(3, 3, CV_64FC1);
             cv::Rodrigues(rvec, rot);
             tf2::Quaternion quaternion = fromCV(rot);
+            RCLCPP_INFO(get_logger(), "Tvec: %f, %f, %f", tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0), tvec.at<double>(3, 0));
             tf2::Vector3 translation = fromCV(cv::Point3d(tvec.at<double>(0, 0), tvec.at<double>(1, 0), tvec.at<double>(2, 0)));
             return tf2::Transform(quaternion, translation);
         }
@@ -234,7 +245,7 @@ namespace nfr
             tf2::fromMsg(robotToCameraMessage.transform, robotToCamera);
             if (useMultiTagPnP && detections->detections.size() > 1)
             {
-                tf2::Transform fieldToCamera = multiTagPnP(*detections, cameraInfo);
+                tf2::Transform fieldToCamera = multiTagPnP(*detections, cameraInfo).inverse();
                 printTransform(fieldToCamera);
                 tf2::Transform robotPose = robotToCamera * fieldToCamera.inverse();
                 RCLCPP_INFO(get_logger(), "Calculated pose using MultiTagPnP");
@@ -260,8 +271,11 @@ namespace nfr
                 for (auto detection : detections->detections)
                 {
                     tf2::Transform cameraToTag = singleTagPnP(detection, cameraInfo);
+                    printTransform(cameraToTag);
                     tf2::Transform fieldToTag = tagPoses[detection.id];
-                    tf2::Transform robotPose = robotToCamera * cameraToTag.inverse() * fieldToTag;
+                    printTransform(fieldToTag);
+                    tf2::Transform robotPose = fieldToTag * cameraToTag.inverse() * robotToCamera.inverse();
+                    printTransform(robotPose);
                     RCLCPP_INFO(get_logger(), "Calculated pose using SingleTagPnP");
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
                     pose.header.frame_id = baseFrame;
