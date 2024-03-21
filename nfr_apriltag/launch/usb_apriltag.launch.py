@@ -106,10 +106,7 @@ def generate_launch_description():
             'camera_port': camera_port,
             'fps': fps
         }],
-        condition=IfCondition(launch_camera_server),
-        remappings=[
-            ("image", "image_rect")
-        ]
+        condition=IfCondition(launch_camera_server)
     )
     return LaunchDescription([
         tag_size_argument,

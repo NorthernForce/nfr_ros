@@ -25,13 +25,16 @@ namespace nfr
             RCLCPP_INFO(get_logger(), "Opening outputStream for %d, %d, %d", resolutionWidth, resolutionHeight, fps);
             outputStream = cs::CvSource(cameraName, cs::VideoMode::kMJPEG, resolutionWidth, resolutionHeight, fps);
             RCLCPP_INFO(get_logger(), "Opened outputStream");
+            RCLCPP_INFO(get_logger(), "Hello");
             server.SetSource(outputStream);
-            imageSubscriber = create_subscription<sensor_msgs::msg::Image>("image", 10, [&](sensor_msgs::msg::Image msg) {
-                cv::Mat mat = cv_bridge::toCvCopy(msg, "rgb8")->image;
-                cv::Mat newMat;
-                cv::resize(mat, newMat, {resolutionWidth, resolutionHeight});
-                outputStream.PutFrame(newMat);
-            });
+            imageSubscriber = create_subscription<sensor_msgs::msg::Image>("image", rclcpp::SensorDataQoS(), std::bind(&NFRCameraNode::cameraCallback, this, std::placeholders::_1));
+        }
+        void cameraCallback(const sensor_msgs::msg::Image msg)
+        {
+            cv::Mat mat = cv_bridge::toCvCopy(msg, "rgb8")->image;
+            cv::Mat newMat;
+            cv::resize(mat, newMat, {resolutionWidth, resolutionHeight});
+            outputStream.PutFrame(newMat);
         }
     };
 }

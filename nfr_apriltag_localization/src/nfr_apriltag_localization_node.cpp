@@ -90,7 +90,7 @@ namespace nfr
                 / "field.json";
             std::string fieldPath = declare_parameter<std::string>("field_path", defaultPath);
             tagEdgeSize = declare_parameter<double>("tag_size", 0.165);
-            useMultiTagPnP = declare_parameter<bool>("use_multi_tag_pnp", false);
+            useMultiTagPnP = false;//declare_parameter<bool>("use_multi_tag_pnp", false);
             cameraFrame = declare_parameter<std::string>("camera_frame", "");
             baseFrame = declare_parameter<std::string>("base_frame", "base_link");
             std::ifstream fieldJson(fieldPath);
@@ -274,7 +274,7 @@ namespace nfr
                     printTransform(cameraToTag);
                     tf2::Transform fieldToTag = tagPoses[detection.id];
                     printTransform(fieldToTag);
-                    tf2::Transform robotPose = fieldToTag * cameraToTag.inverse() * robotToCamera.inverse();
+                    tf2::Transform robotPose = fieldToTag * cameraToTag * robotToCamera.inverse();
                     printTransform(robotPose);
                     RCLCPP_INFO(get_logger(), "Calculated pose using SingleTagPnP");
                     geometry_msgs::msg::PoseWithCovarianceStamped pose;
